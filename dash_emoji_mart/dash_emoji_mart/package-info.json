@@ -1,6 +1,6 @@
 {
   "name": "dash_emoji_mart",
-  "version": "0.0.2",
+  "version": "0.0.4",
   "description": "emoji-mart for dash",
   "repository": {
     "type": "git",
@@ -24,9 +24,9 @@
   "author": "pip install python <pipinstallpython@gmail.com>",
   "license": "MIT",
   "dependencies": {
-    "@emoji-mart/data": "^1.1.2",
+    "@emoji-mart/data": "^1.2.1",
     "@emoji-mart/react": "^1.1.1",
-    "emoji-mart": "^5.5.2",
+    "emoji-mart": "^5.6.0",
     "ramda": "^0.26.1"
   },
   "devDependencies": {

@@ -1,6 +1,6 @@
 Package: dashEmojiMart
 Title: emoji-mart for dash
-Version: 0.0.2
+Version: 0.0.4
 Description: emoji-mart for dash
 Depends: R (>= 3.0.2)
 Imports: 
