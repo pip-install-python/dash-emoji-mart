@@ -40,6 +40,24 @@ both at once.
   is right in both places, non-square artwork is not distorted, and raster
   sources render exactly as before.
 
+- **`theme="auto"` follows the APP, then the OS — in that order.** emoji-mart's
+  "auto" reads `prefers-color-scheme` and nothing else, which is the wrong
+  signal in a Dash app: almost every one ships a theme toggle, and a toggle
+  does not touch the OS. On a machine set to dark, flipping a Dash Mantine app
+  to light left every picker dark against a white page — and it looked like the
+  component ignoring its own `theme` prop.
+
+  The component now prefers `data-mantine-color-scheme` on `<html>` when the
+  document advertises one, and falls back to the media query otherwise. Reading
+  an attribute adds no dependency on DMC: an app that does not set it behaves
+  exactly as before. An explicit `theme="light"`/`"dark"` is still passed
+  straight through, and the resolution re-runs on a toggle without a remount.
+
+  This is why the docs site had the bug on six of its pages: only
+  `/theming` wired the clientside callback its own prose recommends. That
+  callback still works and is still the right answer for a non-Mantine toggle —
+  it is just no longer needed for the common case.
+
 ### Fixed — the documentation site
 
 - **The popover example never opened.** `dmc.Popover` toggles `opened` itself
@@ -128,10 +146,26 @@ leaflet, email, flexlayout and llms. Nothing here changes the package.
   successes rather than one, because Render swaps instances and the old one
   answers throughout.
 
-### Measured, not fixed — two upstream findings
+### Measured, not fixed — three upstream findings
 
-Both were verified against dash-improve-my-llms 2.3.4 on this host and are
-recorded so the next pass does not rediscover them.
+All verified on this host and recorded so the next pass does not rediscover
+them.
+
+- **`noCountryFlags` and `exceptEmojis` filter the grid, not the search**
+  (emoji-mart 5.6.0). Both remove the emoji from `category.emojis` while
+  `SearchIndex.search` matches over `Object.values(Data.emojis)` — the
+  unfiltered map — with no category filter of its own. Measured: with
+  `noCountryFlags` on, the flags category shrinks to the safe list and typing
+  "united" still returns 🇬🇧 🇺🇸 🇦🇪 🇺🇳, identically to having it off.
+
+  Not worked around, deliberately. emoji-mart loads its data into a
+  module-global exactly once per page (`if (!Data) Data = props.data`), so
+  pre-filtering the data for one picker would silently change every other
+  picker on the page and every page after it in a Dash SPA — the same aliasing
+  trap `categories` + `custom` already carries a red warning about. A visible
+  search result beats an invisible, mount-order-dependent one. Documented on
+  both props, in the README table, and on the configuration page; pinned by
+  `tests/test_component.py` so a regeneration cannot quietly drop the caveat.
 
 - **The prerender overwrites Dash's per-page `<title>` and appends its own
   `og:title`,** both from the page's registered `name`. `PAGE_TITLE_PREFIX`

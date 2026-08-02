@@ -1,7 +1,101 @@
-import React, {useCallback, useEffect, useMemo, useRef} from 'react';
+import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import PropTypes from 'prop-types';
 import Picker from '@emoji-mart/react';
 import data from '@emoji-mart/data';
+
+// `theme="auto"` follows the APP, then the OS — in that order.
+//
+// emoji-mart's own "auto" reads `prefers-color-scheme` and nothing else. In a
+// Dash app that is the wrong signal: almost every one of them ships a theme
+// toggle, and the toggle does not touch the OS. Flip a Dash Mantine
+// Components app to light on a machine set to dark and every picker in it
+// stays dark, against a white page. Nothing errors, and it looks like the
+// component ignoring its own `theme` prop.
+//
+// The fix is to prefer an explicit app-level colour scheme when the document
+// advertises one. `data-mantine-color-scheme` on <html> is what DMC sets, and
+// reading an attribute creates no dependency on DMC — an app that does not use
+// it simply falls through to the media query, which is emoji-mart's behaviour
+// unchanged.
+//
+// DMC writes "auto" into that attribute when it is itself following the
+// system, so "auto" there has to fall through rather than be taken literally.
+const APP_SCHEME_ATTR = 'data-mantine-color-scheme';
+
+const resolveAutoTheme = () => {
+    if (typeof document === 'undefined') {
+        return 'light';
+    }
+    const declared = document.documentElement.getAttribute(APP_SCHEME_ATTR);
+    if (declared === 'light' || declared === 'dark') {
+        return declared;
+    }
+    return typeof window !== 'undefined' &&
+        window.matchMedia &&
+        window.matchMedia('(prefers-color-scheme: dark)').matches
+        ? 'dark'
+        : 'light';
+};
+
+/**
+ * The concrete 'light' | 'dark' to hand emoji-mart.
+ *
+ * An explicit `theme` is passed straight through — this only resolves "auto",
+ * and it re-resolves when either signal changes, so a toggle takes effect
+ * without a remount.
+ */
+const useResolvedTheme = (theme) => {
+    const [resolved, setResolved] = useState(() =>
+        theme === 'auto' ? resolveAutoTheme() : theme
+    );
+
+    useEffect(() => {
+        if (theme !== 'auto') {
+            setResolved(theme);
+            return undefined;
+        }
+        if (typeof document === 'undefined') {
+            return undefined;
+        }
+
+        const sync = () => setResolved(resolveAutoTheme());
+        sync();
+
+        // The app's toggle: an attribute flip on <html>, no event to listen for.
+        const observer = new MutationObserver(sync);
+        observer.observe(document.documentElement, {
+            attributes: true,
+            attributeFilter: [APP_SCHEME_ATTR],
+        });
+
+        // The OS preference, which still decides when no app scheme is set.
+        const media =
+            typeof window !== 'undefined' && window.matchMedia
+                ? window.matchMedia('(prefers-color-scheme: dark)')
+                : null;
+        if (media) {
+            // Safari < 14 has no addEventListener on MediaQueryList.
+            if (media.addEventListener) {
+                media.addEventListener('change', sync);
+            } else if (media.addListener) {
+                media.addListener(sync);
+            }
+        }
+
+        return () => {
+            observer.disconnect();
+            if (media) {
+                if (media.removeEventListener) {
+                    media.removeEventListener('change', sync);
+                } else if (media.removeListener) {
+                    media.removeListener(sync);
+                }
+            }
+        };
+    }, [theme]);
+
+    return resolved;
+};
 
 // Custom-emoji images, sized so that dimensionless SVGs are not invisible.
 //
@@ -164,6 +258,10 @@ const DashEmojiMart = ({
     //
     // Instead: our own listener, containment-tested against the wrapper, and
     // attached one task later so the opening click has finished dispatching.
+    // Resolved here rather than handed to emoji-mart as "auto" — see
+    // useResolvedTheme above for why the media query alone is the wrong signal.
+    const resolvedTheme = useResolvedTheme(theme);
+
     const wrapperRef = useRef(null);
     // Refs, so the effect binds once instead of re-binding on every count
     // change (which would reintroduce the mid-dispatch problem).
@@ -261,7 +359,7 @@ const DashEmojiMart = ({
         set,
         skin,
         skinTonePosition,
-        theme,
+        theme: resolvedTheme,
     };
 
     if (customCategories) {
@@ -373,7 +471,12 @@ DashEmojiMart.propTypes = {
     emojiVersion: PropTypes.number,
 
     /**
-     * Emoji ids to hide, e.g. `["rage", "cry"]`.
+     * Emoji ids to hide from the grid, e.g. `["rage", "cry"]`.
+     *
+     * GRID ONLY — searching still finds them, for the same reason as
+     * `noCountryFlags`: both filters remove the emoji from its category while
+     * `SearchIndex.search` reads the unfiltered emoji map. Do not rely on this
+     * to keep a specific emoji away from a user.
      */
     exceptEmojis: PropTypes.array,
 
@@ -398,7 +501,21 @@ DashEmojiMart.propTypes = {
     navPosition: PropTypes.string,
 
     /**
-     * Hide country flags. Default False.
+     * Hide country flags from the grid. Default False.
+     *
+     * GRID ONLY — searching still finds them. This is an emoji-mart
+     * limitation, measured against 5.6.0: the filter runs while building each
+     * category and removes the emoji from `category.emojis`, but
+     * `SearchIndex.search` matches over `Object.values(Data.emojis)`, the
+     * unfiltered map, and applies no category filter of its own. So with this
+     * on, the flags category shrinks to a small safe list while typing
+     * "united" still returns the flags of the UK, US, UAE and the UN.
+     *
+     * Not worked around here on purpose. emoji-mart loads its data into a
+     * module-global exactly once per page, so pre-filtering the data for one
+     * picker would silently change every other picker on the page and every
+     * page after it in a Dash SPA. A visible search result is better than an
+     * invisible, mount-order-dependent one.
      */
     noCountryFlags: PropTypes.bool,
 

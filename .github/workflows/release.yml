@@ -9,7 +9,12 @@ name: Release
 # setup on PyPI (see RELEASING.md):
 #   pypi.org -> your project -> Publishing -> Add a new pending publisher
 #     Owner:            pip-install-python
-#     Repository:       dash_emoji_mart
+#     Repository:       dash-emoji-mart   <- HYPHENS. The repo was renamed from
+#                                            dash_emoji_mart; GitHub redirects
+#                                            the URL but OIDC does NOT redirect
+#                                            the claim, so a publisher entry
+#                                            holding the old name fails with an
+#                                            opaque 403 at upload time.
 #     Workflow name:    release.yml
 #     Environment name: pypi
 on:

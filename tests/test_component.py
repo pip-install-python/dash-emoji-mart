@@ -215,3 +215,48 @@ def test_iconify_survives_an_unreachable_api(monkeypatch):
 
     monkeypatch.setattr(iconify, "get_collection_info", lambda prefix: {})
     assert iconify.iconify_to_emoji_mart(["twemoji", "noto"]) == []
+
+
+# ---------------------------------------------------------------------------
+# Prop documentation that has to stay honest
+#
+# Two props filter the grid and NOT the search — measured against emoji-mart
+# 5.6.0. Somebody reading `exceptEmojis` as "hide this emoji" and relying on it
+# is the failure this guards, so the caveat has to survive a regeneration of
+# the Python class from the JS propTypes.
+# ---------------------------------------------------------------------------
+
+
+def test_grid_only_filters_say_so_in_their_docstring():
+    import re
+
+    import dash_emoji_mart as dem
+
+    # Whitespace-normalised: dash-generate-components hard-wraps the propTypes
+    # comments into the class docstring, so the phrase arrives split across a
+    # line break ("GRID\n    ONLY") and a literal substring test misses it.
+    doc = re.sub(r"\s+", " ", dem.DashEmojiMart.__doc__ or "")
+    for prop in ("noCountryFlags", "exceptEmojis"):
+        assert prop in doc, f"{prop} is missing from the component docstring"
+    assert doc.count("GRID ONLY") >= 2, (
+        "the grid-only caveat is missing from noCountryFlags/exceptEmojis — "
+        "did `npm run build:backends` regenerate DashEmojiMart.py from stale "
+        f"propTypes? found {doc.count('GRID ONLY')}"
+    )
+
+
+def test_theme_auto_prefers_the_app_colour_scheme():
+    """The picker follows the app's toggle, then the OS — not the OS alone.
+
+    Pinned in the built bundle rather than the source, because the bundle is
+    what ships: a rebuild that dropped the resolver would leave every picker in
+    a Dash Mantine app stuck on the machine's setting.
+    """
+    from pathlib import Path
+
+    bundle = (Path(__file__).resolve().parent.parent
+              / "dash_emoji_mart" / "dash_emoji_mart.min.js").read_text(errors="replace")
+    assert "data-mantine-color-scheme" in bundle, (
+        "the theme resolver is not in the shipped bundle — run `npm run build`"
+    )
+    assert "prefers-color-scheme" in bundle, "the OS fallback is missing"

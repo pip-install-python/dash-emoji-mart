@@ -88,7 +88,11 @@ Keyword arguments:
     Maximum Emoji version to show. Default 14.
 
 - exceptEmojis (list; optional):
-    Emoji ids to hide, e.g. `[\"rage\", \"cry\"]`.
+    Emoji ids to hide from the grid, e.g. `[\"rage\", \"cry\"]`.  GRID
+    ONLY — searching still finds them, for the same reason as
+    `noCountryFlags`: both filters remove the emoji from its category
+    while `SearchIndex.search` reads the unfiltered emoji map. Do not
+    rely on this to keep a specific emoji away from a user.
 
 - icons (string; default 'auto'):
     Category/search icon style: `\"auto\"`, `\"outline\"` or
@@ -104,7 +108,20 @@ Keyword arguments:
     Category nav position: `\"top\"`, `\"bottom\"` or `\"none\"`.
 
 - noCountryFlags (boolean; default False):
-    Hide country flags. Default False.
+    Hide country flags from the grid. Default False.  GRID ONLY —
+    searching still finds them. This is an emoji-mart limitation,
+    measured against 5.6.0: the filter runs while building each
+    category and removes the emoji from `category.emojis`, but
+    `SearchIndex.search` matches over `Object.values(Data.emojis)`,
+    the unfiltered map, and applies no category filter of its own. So
+    with this on, the flags category shrinks to a small safe list
+    while typing \"united\" still returns the flags of the UK, US, UAE
+    and the UN.  Not worked around here on purpose. emoji-mart loads
+    its data into a module-global exactly once per page, so
+    pre-filtering the data for one picker would silently change every
+    other picker on the page and every page after it in a Dash SPA. A
+    visible search result is better than an invisible,
+    mount-order-dependent one.
 
 - noResultsEmoji (string; default 'cry'):
     Emoji id shown when a search returns nothing. Default `\"cry\"`.

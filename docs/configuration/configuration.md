@@ -85,6 +85,29 @@ load spritesheets from jsDelivr.
 `"es"`, `"fa"`, `"fi"`, `"fr"`, `"hi"`, `"it"`, `"ja"`, `"ko"`, `"nl"`, `"pl"`, `"pt"`,
 `"ru"`, `"sa"`, `"tr"`, `"uk"`, `"vi"` and `"zh"` ship with emoji-mart.
 
+.. admonition::`noCountryFlags` and `exceptEmojis` filter the grid, not the search
+    :icon: radix-icons:exclamation-triangle
+    :color: orange
+
+    Turn `noCountryFlags` on above, then type "united" into the picker's search box. The
+    flags category has shrunk to a short safe list — and the search still returns the
+    flags of the UK, the US, the UAE and the UN.
+
+    Measured against emoji-mart 5.6.0, and it is the same code path for both props: the
+    filter runs while each category is built and splices the emoji out of
+    `category.emojis`, while `SearchIndex.search` matches over
+    `Object.values(Data.emojis)` — the unfiltered map — and applies no category filter of
+    its own.
+
+    Not worked around in this component, deliberately. emoji-mart loads its data into a
+    module-global exactly once per page, so pre-filtering the data for one picker would
+    silently change every other picker on the page, and every page after it in a Dash
+    SPA — the same aliasing trap described on [Custom emojis](/custom-emojis). A visible
+    search result beats an invisible, mount-order-dependent one.
+
+    Use them for tidying, never as access control. To keep an emoji away from a user
+    entirely, pass a trimmed data set rather than a filter.
+
 .. admonition::Changing `set` or `locale` needs a remount
     :icon: radix-icons:exclamation-triangle
     :color: orange

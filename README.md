@@ -187,9 +187,9 @@ the component docstring (`help(DashEmojiMart)`). The commonly used ones:
 | `skin` | `1` | `1`–`6` |
 | `emojiVersion` | `14` | max Emoji version to show |
 | `maxFrequentRows` | `4` | `0` disables the frequent category |
-| `exceptEmojis` | `[]` | emoji ids to hide |
+| `exceptEmojis` | `[]` | emoji ids to hide **from the grid** — search still finds them, see below |
 | `noResultsEmoji` | `"cry"` | shown when a search finds nothing |
-| `noCountryFlags` | `False` | Windows has no country-flag glyphs |
+| `noCountryFlags` | `False` | hide country flags **from the grid** — search still finds them, see below |
 | `icons` | `"auto"` | `auto`, `outline`, `solid` |
 | `autoFocus` | `False` | focus the search input on mount |
 | `dynamicWidth` | `False` | fill the container instead of sizing from `perLine` |
@@ -202,6 +202,12 @@ the component docstring (`help(DashEmojiMart)`). The commonly used ones:
 > `html.Div(..., id=...)` whose **id** varies with the value to force a remount (Dash keys
 > each child on its id; a `key=` prop is not read for reconciliation). Every other prop
 > updates in place.
+>
+> **`exceptEmojis` and `noCountryFlags` filter the grid, not the search.** Measured
+> against emoji-mart 5.6.0: both remove the emoji from its category, while
+> `SearchIndex.search` matches over the unfiltered emoji map. With
+> `noCountryFlags=True` the flags category shrinks to a small safe list and typing
+> "united" still returns 🇬🇧 🇺🇸 🇦🇪 🇺🇳. Treat them as tidying, not as access control.
 >
 > **Do not pass `categories` together with `custom`.** emoji-mart filters `categories`
 > against a snapshot it takes on the first picker initialised in the page's lifetime, so
