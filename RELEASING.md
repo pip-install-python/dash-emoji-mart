@@ -16,9 +16,13 @@ publisher*:
 | Field | Value |
 |-------|-------|
 | Owner | `pip-install-python` |
-| Repository | `dash_emoji_mart` |
+| Repository | `dash-emoji-mart` |
 | Workflow name | `release.yml` |
 | Environment name | `pypi` |
+
+The repository name is **hyphenated**. The repo was renamed from `dash_emoji_mart`;
+GitHub redirects the URL but OIDC does **not** redirect the claim, so a publisher entry
+holding the old underscore name fails with an opaque 403 at upload time.
 
 The environment name must match the `environment:` block in `release.yml`. Add a required
 reviewer on that environment in the repository settings if you want a human approval gate
