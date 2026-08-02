@@ -12,7 +12,7 @@
 one most React apps reach for — wrapped as a single Dash component.
 
 [![PyPI](https://img.shields.io/pypi/v/dash-emoji-mart?color=fab005)](https://pypi.org/project/dash-emoji-mart/)
-[![Python](https://img.shields.io/pypi/pyversions/dash-emoji-mart)](https://pypi.org/project/dash-emoji-mart/)
+[![Python](https://img.shields.io/badge/python-%E2%89%A53.9-3776AB)](https://pypi.org/project/dash-emoji-mart/)
 [![Dash](https://img.shields.io/badge/dash-%E2%89%A54.1-119DFF)](https://dash.plotly.com/)
 [![License](https://img.shields.io/badge/license-MIT-green)](./LICENSE)
 [![Docs](https://img.shields.io/badge/docs-emojimart.2plot.dev-fab005)](https://emojimart.2plot.dev)
