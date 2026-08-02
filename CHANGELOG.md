@@ -58,6 +58,26 @@ both at once.
   callback still works and is still the right answer for a non-Mantine toggle —
   it is just no longer needed for the common case.
 
+- **`dynamicWidth` made the picker collapse instead of fill.** emoji-mart
+  implements the option by setting `width: 100%` on a `<section>` inside its
+  shadow root and never touches the `<em-emoji-picker>` host. A custom element
+  has no author width, so it sizes to its content — and its content is that
+  section asking for 100% of the host. The constraint is circular and resolves
+  at min-content: measured, turning the switch on took the picker from 532px to
+  **216px** inside a 482px parent, and the grid reflowed under the pointer,
+  which reads as the component glitching on hover.
+
+  The component now sizes the host itself when `dynamicWidth` is on, and clears
+  the width when it is off. It has to happen outside the shadow root: the host
+  is in the light DOM, so no shadow stylesheet reaches it, and `className` /
+  `style` apply to our wrapper rather than to it. Measured after: 352px → 482px
+  (the full container), 9 → 13 emoji per row, and it reverts cleanly.
+
+  The container still needs a width of its own for "100%" to mean anything —
+  a shrink-to-fit flex item gives 100% of nothing — so
+  `docs/configuration/example.py` now gives the mount `flex: 1; minWidth: 0`
+  and says why.
+
 ### Fixed — the documentation site
 
 - **The popover example never opened.** `dmc.Popover` toggles `opened` itself
@@ -151,6 +171,16 @@ leaflet, email, flexlayout and llms. Nothing here changes the package.
 All verified on this host and recorded so the next pass does not rediscover
 them.
 
+- **Removing a category is one-way for the lifetime of the page.** Setting
+  `maxFrequentRows` to `0` drops the Frequently-used section and setting it
+  back does not restore it; picking a few `categories` and then clearing the
+  field does not restore "all of them" either. Same cause: `init()` builds
+  `Data.categories` once and mutates that array in place, `splice`-ing out any
+  category that ends up empty, and the only path that rebuilds it from
+  `Data.originalCategories` is the one that runs when `categories` is passed.
+  The state is a module global that outlives the component, every remount and
+  every SPA navigation; a page reload is the only reset. Documented on the
+  configuration page.
 - **`noCountryFlags` and `exceptEmojis` filter the grid, not the search**
   (emoji-mart 5.6.0). Both remove the emoji from `category.emojis` while
   `SearchIndex.search` matches over `Object.values(Data.emojis)` — the

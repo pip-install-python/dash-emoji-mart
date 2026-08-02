@@ -85,6 +85,28 @@ load spritesheets from jsDelivr.
 `"es"`, `"fa"`, `"fi"`, `"fr"`, `"hi"`, `"it"`, `"ja"`, `"ko"`, `"nl"`, `"pl"`, `"pt"`,
 `"ru"`, `"sa"`, `"tr"`, `"uk"`, `"vi"` and `"zh"` ship with emoji-mart.
 
+.. admonition::Removing a category is one-way until you reload
+    :icon: radix-icons:exclamation-triangle
+    :color: orange
+
+    Two controls above can take a category away and not give it back:
+
+    * set `maxFrequentRows` to `0` and the Frequently-used section disappears —
+      setting it back to `4` does not bring it back;
+    * pick a few `categories`, then clear the field. "All of them" does not return.
+
+    Both are the same emoji-mart behaviour, and it is global rather than per-picker.
+    `init()` builds `Data.categories` once and then mutates that array in place: a
+    category that ends up empty is `splice`d straight out of it. The only code path
+    that rebuilds the list from `Data.originalCategories` is the one that runs when
+    you pass `categories` — which is why choosing categories restores Frequently-used
+    while clearing them does not.
+
+    So the state lives in a module global that outlives the component, the page and
+    every remount. Reloading the page is the only reset. If a category needs to come
+    and go at runtime, pass `categories` explicitly every time rather than relying on
+    the empty default.
+
 .. admonition::`noCountryFlags` and `exceptEmojis` filter the grid, not the search
     :icon: radix-icons:exclamation-triangle
     :color: orange

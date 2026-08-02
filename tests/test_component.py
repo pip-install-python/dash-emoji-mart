@@ -260,3 +260,27 @@ def test_theme_auto_prefers_the_app_colour_scheme():
         "the theme resolver is not in the shipped bundle — run `npm run build`"
     )
     assert "prefers-color-scheme" in bundle, "the OS fallback is missing"
+
+
+def test_dynamic_width_sizes_the_host_element():
+    """`dynamicWidth` needs the HOST sized, not just emoji-mart's section.
+
+    emoji-mart implements the option by setting `width: 100%` on a <section>
+    inside its shadow root and never touches the <em-emoji-picker> host. A
+    custom element has no author width, so it sizes to its content — and its
+    content is that section asking for 100% of the host. The constraint is
+    circular: measured, turning the option on COLLAPSED the picker from 532px
+    to 216px inside a 482px parent.
+
+    Pinned in the shipped bundle, because that is what a `pip install` gets.
+    """
+    from pathlib import Path
+
+    bundle = (Path(__file__).resolve().parent.parent
+              / "dash_emoji_mart" / "dash_emoji_mart.min.js").read_text(errors="replace")
+    assert "em-emoji-picker" in bundle
+    # The host-sizing effect: a width set from the dynamicWidth branch.
+    assert 'style.width="100%"' in bundle or "style.width='100%'" in bundle, (
+        "the dynamicWidth host-sizing effect is not in the bundle — "
+        "run `npm run build`"
+    )

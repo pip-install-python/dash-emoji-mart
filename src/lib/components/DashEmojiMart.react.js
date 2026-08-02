@@ -333,6 +333,38 @@ const DashEmojiMart = ({
         // root never goes unstyled.
     }, [set, locale, custom]);
 
+    // Make `dynamicWidth` actually widen the picker.
+    //
+    // emoji-mart implements the option by setting `width: 100%` on a <section>
+    // INSIDE its shadow root, and never touches the <em-emoji-picker> host. The
+    // host is a custom element, so it has no author width of its own and sizes
+    // to its content — and its content is the section asking for 100% of the
+    // host. The constraint is circular and resolves at min-content, so turning
+    // the option on made the picker COLLAPSE (measured: 532px -> 216px inside a
+    // 482px parent) instead of filling anything, and the grid reflowed under
+    // the pointer while hovering.
+    //
+    // Sizing the host is the missing half, and it has to happen out here: the
+    // host is in the light DOM, so no shadow stylesheet can reach it, and the
+    // wrapper `className`/`style` props apply to our own div rather than to it.
+    //
+    // The container still needs a width for "100%" to mean something — a
+    // shrink-to-fit flex item gives 100% of nothing. That is the caller's
+    // layout, and docs/configuration/example.py shows it.
+    useEffect(() => {
+        const host =
+            wrapperRef.current &&
+            wrapperRef.current.querySelector('em-emoji-picker');
+        if (!host) {
+            return;
+        }
+        if (dynamicWidth) {
+            host.style.width = '100%';
+        } else {
+            host.style.removeProperty('width');
+        }
+    }, [dynamicWidth, set, locale, custom]);
+
     const pickerProps = {
         data,
         onEmojiSelect: handleEmojiSelect,

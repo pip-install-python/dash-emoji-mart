@@ -154,7 +154,23 @@ component = dmc.Stack(
         dmc.Paper(controls, withBorder=True, p="lg", radius="md"),
         dmc.Group(
             [
-                html.Div(id="cfg-picker"),
+                # `flex: 1` and `minWidth: 0` are what make `dynamicWidth`
+                # demonstrable rather than broken.
+                #
+                # dynamicWidth tells emoji-mart to set `width: 100%` instead of
+                # sizing itself from `perLine`. A bare Div inside this flex
+                # Group is `flex: 0 1 auto`, so its own width comes from its
+                # content — and the content is now asking for 100% OF THAT.
+                # The circular constraint resolves at min-content, so turning
+                # the switch on made the picker COLLAPSE from 352px to 190px
+                # and the grid reflow under the pointer, which reads as the
+                # component glitching.
+                #
+                # Giving the mount a real width to fill fixes it: `flex: 1`
+                # makes it claim the leftover row space, `minWidth: 0` lets it
+                # shrink below its content's intrinsic width instead of forcing
+                # the Group wider.
+                html.Div(id="cfg-picker", style={"flex": 1, "minWidth": 0}),
                 dmc.Stack(
                     [
                         dmc.Paper(

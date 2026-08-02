@@ -291,22 +291,31 @@ def test_the_apple_touch_icon_is_declared_and_resolves(client):
     assert client.get(match.group(1)).ok, f"{match.group(1)} does not resolve"
 
 
-def test_the_apple_touch_icon_is_opaque():
+def test_the_apple_touch_icon_has_no_alpha_channel():
     """iOS composites a transparent icon onto WHITE.
 
     A dark-themed site that ships an alpha apple-touch-icon gets a glaring
     white tile on the home screen — which nobody sees unless they own an
     iPhone and add the site to it.
-    """
-    from PIL import Image
 
-    icon = Image.open(REPO_ROOT / "assets" / "favicon" / "apple-touch-icon.png")
-    if icon.mode == "RGBA":
-        alpha = icon.getchannel("A")
-        assert alpha.getextrema()[0] == 255, (
-            "the apple-touch-icon has transparent pixels; iOS will back them "
-            "with white"
-        )
+    Read from the PNG header rather than with Pillow, on purpose. Pillow is a
+    BUILD-time dependency and is deliberately absent from requirements.txt, so
+    a test that imports it passes on the machine that generated the icons and
+    fails in CI, in the container, and on a fresh checkout. It did.
+
+    The IHDR is fixed-layout: 8-byte signature, 4-byte length, "IHDR", width,
+    height, bit depth, then colour type at byte 25. 2 is truecolour with no
+    alpha channel at all; 4 and 6 carry one. `scripts/make_brand_assets.py`
+    emits RGB for this file specifically so the question is structural instead
+    of needing a per-pixel scan.
+    """
+    raw = (REPO_ROOT / "assets" / "favicon" / "apple-touch-icon.png").read_bytes()
+    assert raw[:8] == b"\x89PNG\r\n\x1a\n", "not a PNG"
+    colour_type = raw[25]
+    assert colour_type in (0, 2), (
+        f"apple-touch-icon.png declares PNG colour type {colour_type}, which "
+        "carries an alpha channel; iOS will back transparent pixels with white"
+    )
 
 
 def test_the_theme_colour_agrees_with_the_manifest(client):

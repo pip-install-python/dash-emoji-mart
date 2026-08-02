@@ -43,10 +43,21 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT))
 
-try:
-    from PIL import Image
-except ImportError:  # pragma: no cover - the one dependency, named clearly
-    sys.exit("This script needs Pillow:\n    pip install Pillow")
+# Pillow is imported INSIDE the render path, not here.
+#
+# `--check` only compares a JSON document against lib/constants.py and stats a
+# few files — no pixels involved. Importing Pillow at module scope made the
+# check impossible to run anywhere Pillow is absent, which is everywhere that
+# matters: Pillow is deliberately not in requirements.txt (nothing at runtime
+# renders images), so CI, the container and a fresh contributor checkout all
+# lack it. The suite calls `--check`, so a top-level import turned a build-time
+# dependency into a test-time one and failed every CI job.
+def _pillow():
+    try:
+        from PIL import Image
+    except ImportError:  # pragma: no cover - the one dependency, named clearly
+        sys.exit("This script needs Pillow:\n    pip install Pillow")
+    return Image
 
 SOURCE = REPO_ROOT / "assets" / "brand" / "cowboy-hat-face.png"
 OUT_DIR = REPO_ROOT / "assets" / "favicon"
@@ -75,7 +86,8 @@ ICO_SIZES = (16, 32, 48)
 PAD_FRACTION = 0.08
 
 
-def _load_source() -> Image.Image:
+def _load_source():
+    Image = _pillow()
     if not SOURCE.exists():
         sys.exit(f"source glyph missing: {SOURCE.relative_to(REPO_ROOT)}")
     art = Image.open(SOURCE).convert("RGBA")
@@ -83,8 +95,16 @@ def _load_source() -> Image.Image:
     return art.crop(bbox) if bbox else art
 
 
-def _tile(art: Image.Image, size: int, *, opaque: bool) -> Image.Image:
-    """The glyph centred on a square canvas, padded, optionally flattened."""
+def _tile(art, size: int, *, opaque: bool):
+    """The glyph centred on a square canvas, padded, optionally flattened.
+
+    `opaque=True` returns RGB — the alpha channel is DROPPED, not merely filled.
+    A fully-opaque RGBA file still declares colour type 6 in its PNG header, and
+    "is this icon opaque?" then needs Pillow to answer. Emitting RGB makes the
+    answer structural: colour type 2, readable from the IHDR with the standard
+    library, which is what tests/test_social_card.py does.
+    """
+    Image = _pillow()
     canvas = Image.new("RGBA", (size, size), BG if opaque else (0, 0, 0, 0))
     inner = max(1, int(size * (1 - 2 * PAD_FRACTION)))
     glyph = art.copy()
@@ -92,47 +112,14 @@ def _tile(art: Image.Image, size: int, *, opaque: bool) -> Image.Image:
     canvas.alpha_composite(
         glyph, ((size - glyph.width) // 2, (size - glyph.height) // 2)
     )
-    return canvas
+    return canvas.convert("RGB") if opaque else canvas
 
 
-def build(check: bool) -> int:
-    from lib.constants import PRIMARY_COLOR, SITE_BRAND, SITE_SHORT_NAME  # noqa: F401
+def _manifest() -> dict:
+    """The manifest document, derived from the constants. No pixels involved."""
+    from lib.constants import SITE_BRAND, SITE_SHORT_NAME
 
-    art = _load_source()
-    OUT_DIR.mkdir(parents=True, exist_ok=True)
-
-    written: list[tuple[str, str]] = []
-
-    def emit(path: Path, image: Image.Image, **save_kwargs) -> None:
-        if check:
-            if not path.exists():
-                written.append((path.name, "MISSING"))
-            return
-        image.save(path, **save_kwargs)
-        written.append((path.name, f"{image.width}x{image.height}"))
-
-    # Transparent PNGs — the manifest icons. `purpose: any` in the manifest, so
-    # transparency is correct here: the launcher supplies its own backdrop.
-    for size in PNG_SIZES:
-        emit(OUT_DIR / f"favicon-{size}.png", _tile(art, size, opaque=False),
-             format="PNG", optimize=True)
-
-    # Opaque — see APPLE_SIZE above.
-    emit(OUT_DIR / "apple-touch-icon.png", _tile(art, APPLE_SIZE, opaque=True),
-         format="PNG", optimize=True)
-
-    # The .ico. Pillow writes every requested size into the one file.
-    #
-    # One copy, in this subdirectory. Dash's {%favicon%} placeholder scans the
-    # whole assets tree for a file named favicon.ico rather than only the
-    # assets root, so it finds this one and emits its own <link rel="icon">
-    # pointing here — measured, not assumed. An extra copy at assets/favicon.ico
-    # was written at first and never served.
-    ico = _tile(art, max(ICO_SIZES), opaque=False)
-    emit(OUT_DIR / "favicon.ico", ico, format="ICO",
-         sizes=[(s, s) for s in ICO_SIZES])
-
-    manifest = {
+    return {
         "name": SITE_BRAND,
         "short_name": SITE_SHORT_NAME,
         "description": (
@@ -155,24 +142,82 @@ def build(check: bool) -> int:
             for size in PNG_SIZES
         ],
     }
-    manifest_path = OUT_DIR / "site.webmanifest"
-    if check:
-        if not manifest_path.exists():
-            written.append((manifest_path.name, "MISSING"))
-        elif json.loads(manifest_path.read_text()) != manifest:
-            written.append((manifest_path.name, "STALE"))
-    else:
-        manifest_path.write_text(json.dumps(manifest, indent=2) + "\n")
-        written.append((manifest_path.name, "ok"))
 
-    if check:
-        stale = [name for name, state in written if state in ("MISSING", "STALE")]
-        if stale:
-            print("[brand] out of date: " + ", ".join(stale), file=sys.stderr)
-            print("[brand] run: python scripts/make_brand_assets.py", file=sys.stderr)
-            return 1
-        print("[brand] every generated asset is present and current")
-        return 0
+
+GENERATED = (
+    [f"favicon-{size}.png" for size in PNG_SIZES]
+    + ["apple-touch-icon.png", "favicon.ico", "site.webmanifest"]
+)
+
+
+def check() -> int:
+    """Verify without rendering — and therefore without Pillow.
+
+    Deliberately separate from `render()` rather than a flag threaded through
+    it. The suite runs this, and the suite runs where Pillow is not installed;
+    sharing a code path with the renderer is what put a `from PIL import Image`
+    on the check's critical path and failed every CI job.
+    """
+    problems = []
+    for name in GENERATED:
+        if not (OUT_DIR / name).exists():
+            problems.append(f"{name} MISSING")
+
+    manifest_path = OUT_DIR / "site.webmanifest"
+    if manifest_path.exists():
+        try:
+            on_disk = json.loads(manifest_path.read_text())
+        except json.JSONDecodeError as exc:
+            problems.append(f"site.webmanifest UNREADABLE ({exc})")
+        else:
+            if on_disk != _manifest():
+                problems.append(
+                    "site.webmanifest STALE — it disagrees with lib/constants.py"
+                )
+
+    if problems:
+        for problem in problems:
+            print(f"[brand] {problem}", file=sys.stderr)
+        print("[brand] run: python scripts/make_brand_assets.py", file=sys.stderr)
+        return 1
+
+    print("[brand] every generated asset is present and current")
+    return 0
+
+
+def render() -> int:
+    art = _load_source()
+    OUT_DIR.mkdir(parents=True, exist_ok=True)
+    written: list[tuple[str, str]] = []
+
+    def emit(path: Path, image, **save_kwargs) -> None:
+        image.save(path, **save_kwargs)
+        written.append((path.name, f"{image.width}x{image.height}"))
+
+    # Transparent PNGs — the manifest icons. `purpose: any` in the manifest, so
+    # transparency is correct here: the launcher supplies its own backdrop.
+    for size in PNG_SIZES:
+        emit(OUT_DIR / f"favicon-{size}.png", _tile(art, size, opaque=False),
+             format="PNG", optimize=True)
+
+    # Opaque, and RGB rather than filled RGBA — see _tile and APPLE_SIZE.
+    emit(OUT_DIR / "apple-touch-icon.png", _tile(art, APPLE_SIZE, opaque=True),
+         format="PNG", optimize=True)
+
+    # The .ico. Pillow writes every requested size into the one file.
+    #
+    # One copy, in this subdirectory. Dash's {%favicon%} placeholder scans the
+    # whole assets tree for a file named favicon.ico rather than only the
+    # assets root, so it finds this one and emits its own <link rel="icon">
+    # pointing here — measured, not assumed. An extra copy at assets/favicon.ico
+    # was written at first and never served.
+    emit(OUT_DIR / "favicon.ico", _tile(art, max(ICO_SIZES), opaque=False),
+         format="ICO", sizes=[(s, s) for s in ICO_SIZES])
+
+    (OUT_DIR / "site.webmanifest").write_text(
+        json.dumps(_manifest(), indent=2) + "\n"
+    )
+    written.append(("site.webmanifest", "ok"))
 
     for name, detail in written:
         print(f"[brand] {name:24} {detail}")
@@ -185,7 +230,7 @@ def main() -> int:
     ap.add_argument("--check", action="store_true",
                     help="verify the generated files exist and the manifest "
                          "matches the constants; write nothing")
-    return build(ap.parse_args().check)
+    return check() if ap.parse_args().check else render()
 
 
 if __name__ == "__main__":
