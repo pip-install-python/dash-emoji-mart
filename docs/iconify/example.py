@@ -10,7 +10,7 @@ back to plain emojis, which is why there is no error branch here.
 """
 
 import dash_mantine_components as dmc
-from dash import Input, Output, callback, html
+from dash import Input, Output, callback, clientside_callback, html
 
 from dash_emoji_mart import DashEmojiMart
 from dash_emoji_mart.iconify import iconify_to_emoji_mart
@@ -79,8 +79,8 @@ def swap_set(prefix):
     total = sum(len(c["emojis"]) for c in categories)
     summary = (
         f"{len(categories)} Iconify categories · {total} icons "
-        "(capped at 48 per category) — they appear after emoji-mart's own "
-        "categories in the nav bar."
+        "(capped at 48 per category). emoji-mart's own categories are still "
+        "here, before these — the picker jumps you past them."
     )
 
     picker = DashEmojiMart(
@@ -120,9 +120,64 @@ def swap_set(prefix):
     Input("iconify-emoji-picker", "selectedEmoji"),
 )
 def show(value, emoji_obj):
+    """Render the pick — which is NOT always an Iconify icon.
+
+    emoji-mart's own categories are still in this picker (see the note on the
+    page about why `categories` cannot filter them out here), so a reader can
+    perfectly well click 🆑 from Symbols. `value` is then the native glyph, not
+    a URL, and this callback used to hand it to `html.Img(src=...)` regardless
+    — producing `<img src="🆑">`, i.e. a broken-image placeholder next to a
+    correct name.
+
+    Same branch as the custom-emojis page: only a custom emoji has a URL.
+    """
     if not value:
         return dmc.Text("Nothing yet", c="dimmed", size="lg"), ""
-    return (
-        html.Img(src=value, style={"height": 56, "width": 56}),
-        (emoji_obj or {}).get("name", ""),
-    )
+    if value.startswith("http"):
+        glyph = html.Img(src=value, style={"height": 56, "width": 56})
+    else:
+        glyph = dmc.Text(value, style={"fontSize": 56, "lineHeight": 1})
+    return glyph, (emoji_obj or {}).get("name", "")
+
+
+# ---------------------------------------------------------------------------
+# Scroll to the Iconify categories after a set is chosen.
+#
+# emoji-mart appends custom categories AFTER its own nine, and `categories`
+# cannot be used to hide those (see the long note on the picker above — it
+# works for the first set and empties the picker for every set you switch to
+# afterwards; both variants were measured). So choosing "OpenMoji" left the
+# reader looking at Smileys & People with roughly five thousand built-in emoji
+# between them and the thing they just asked for.
+#
+# Rather than fight emoji-mart's data model, jump to the section. This is the
+# picker's own affordance: the last button in its nav bar is the custom-category
+# group, and clicking it is exactly what a reader would do if they knew it was
+# there.
+#
+# Clientside because it is pure DOM work that must happen after the remount
+# paints, and it reaches into the shadow root because that is where the picker
+# lives — nothing about it can be expressed as a Dash prop. Fail-silent by
+# design: if emoji-mart ever renames its nav, the demo simply behaves as it did
+# before rather than erroring.
+clientside_callback(
+    """
+    function (summary) {
+        const jump = (tries) => {
+            const host = document.querySelector('#iconify-picker em-emoji-picker');
+            const nav = host && host.shadowRoot && host.shadowRoot.querySelector('nav');
+            if (!nav) {
+                if (tries > 0) { setTimeout(() => jump(tries - 1), 120); }
+                return;
+            }
+            const buttons = nav.querySelectorAll('button');
+            if (buttons.length) { buttons[buttons.length - 1].click(); }
+        };
+        jump(25);
+        return window.dash_clientside.no_update;
+    }
+    """,
+    Output("iconify-count", "children", allow_duplicate=True),
+    Input("iconify-count", "children"),
+    prevent_initial_call=True,
+)

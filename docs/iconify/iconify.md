@@ -99,6 +99,21 @@ Every request is wrapped: a network failure logs a warning and returns `{}`, so
 set. A page that loses its icon categories beats a page that 500s because
 `api.iconify.design` had a bad minute.
 
+.. admonition::emoji-mart's own categories stay in the picker
+    :icon: radix-icons:info-circled
+
+    Selecting a set filters what this demo *loads*, not what emoji-mart *shows*: its nine
+    built-in categories are still there, ahead of the Iconify ones. `categories` looks
+    like the fix and is not — measured both ways on this page, it filters correctly for
+    the first set chosen and renders an **empty picker** for every set switched to
+    afterwards, because emoji-mart resolves that prop against a category list it captured
+    on the first init of the page's lifetime. Registering all three sets up front does not
+    help either. See [Custom emojis](/custom-emojis) for the underlying aliasing.
+
+    So the demo jumps to the Iconify section instead of hiding the built-ins: choosing a
+    set clicks the picker's own custom-category nav button. If you genuinely need a picker
+    with no built-in emoji at all, pass a trimmed emoji data set rather than a filter.
+
 ### Source
 
 .. source::docs/iconify/example.py
