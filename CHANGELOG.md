@@ -53,6 +53,39 @@ both at once.
   `dmc.Text`. `lib/markdown_inline.py` rebinds the three inline formatters to
   `span=True`. Five invalid nestings across the site, now none.
 
+### Added — a visual identity of its own
+
+The site's mark was `noto:grinning-face-with-smiling-eyes` — the generic yellow
+smiley, which is every emoji library's placeholder and named nothing about this
+one. It is now **🤠 U+1F920**, and the same drawing reaches every surface.
+
+- **Header, favicon and share card are one glyph.** `assets/brand/cowboy-hat-face.png`
+  (Noto Emoji, Apache-2.0) is committed as the single source; the header renders
+  `noto:cowboy-hat-face` through Iconify, so the tab icon, the navigation mark
+  and an unfurl are the same drawing rather than three vendors' idea of it.
+- **`scripts/make_brand_assets.py`** derives the favicon set and the web app
+  manifest from that source: `favicon.ico` (16/32/48), 192 and 512 PNGs, an
+  apple-touch-icon flattened onto the dark surface because iOS backs a
+  transparent icon with white, and `site.webmanifest` whose name, short name
+  and theme colour are read from `lib/constants.py` rather than retyped.
+  `--check` re-derives and compares, so a hand-edit or a stale run fails.
+- **The manifest tests are no longer stubbed.** 0.2.1 shipped this file with a
+  block explaining that the donor's seven installable-app assertions had no
+  surface to test here. They do now: the manifest is linked and served, names
+  this site, is installable, every icon it declares resolves, the
+  apple-touch-icon resolves and is opaque, and the theme colour agrees. Suite
+  is 92 → 99.
+- **The social card exists.** 1200x630, the fleet layout — accent rule, brand,
+  three-line tagline, mono domain — with the cowboy on the right, matching how
+  `email.2plot.dev` frames its artwork. `make_social_card.py` now WARNS when a
+  tagline overflows its three-line budget instead of silently slicing it; the
+  first render of this card read "...custom image and SVG categories, and" and
+  stopped mid-clause, which is precisely the kind of thing nobody catches on an
+  asset they never see.
+- **`github_assets/` is gone.** The 2.9 MB README demo GIF now comes from
+  `cdn.2plot.ai/github_assets/github-demo.gif`, so cloning the repo no longer
+  drags it along.
+
 ### Changed — the 2plot network standard
 
 Brings this host onto the standard proven on 2plot.ai, 2plot.dev, boilerplate,

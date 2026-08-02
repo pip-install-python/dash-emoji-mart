@@ -95,8 +95,34 @@
          page. Only the alt text is missing from its set. -->
     <meta name="twitter:image:alt" content="dash-emoji-mart — emoji picker for Dash">
 
-    <!-- Mantine yellow, matching the brand. -->
+    <!-- Mantine yellow, matching the brand. Must equal the manifest's
+         theme_color and the card's ACCENT — tests/test_social_card.py pins the
+         first pair, scripts/make_brand_assets.py writes the manifest. -->
     <meta name="theme-color" content="#fab005">
+
+    <!-- ========================================================================
+         ICONS AND THE INSTALLABLE-APP SURFACE
+         ========================================================================
+         All generated from one source glyph by scripts/make_brand_assets.py —
+         run it after any brand change rather than exporting icons by hand.
+
+         {%favicon%} below serves assets/favicon.ico for the browser tab; these
+         links cover what Dash does not emit. The apple-touch-icon is separate
+         from the manifest on purpose: iOS ignores the manifest entirely, and it
+         composites a transparent icon onto WHITE, so that file is the one
+         flattened onto the dark surface.
+
+         A referenced-but-uncommitted icon is the failure mode here: the app
+         boots fine locally because the files are on disk, and production 404s
+         the lot. tests/test_social_card.py fetches every /assets/ URL this
+         template names.
+         ======================================================================== -->
+
+    <link rel="icon" href="/assets/favicon/favicon.ico" sizes="any">
+    <link rel="icon" type="image/png" sizes="192x192" href="/assets/favicon/favicon-192.png">
+    <link rel="icon" type="image/png" sizes="512x512" href="/assets/favicon/favicon-512.png">
+    <link rel="apple-touch-icon" href="/assets/favicon/apple-touch-icon.png">
+    <link rel="manifest" href="/assets/favicon/site.webmanifest">
 
     <!-- ========================================================================
          STRUCTURED DATA

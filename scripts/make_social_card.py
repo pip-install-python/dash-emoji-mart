@@ -185,7 +185,22 @@ def build_card(artwork: Path | None, brand: str, tagline: str, domain: str) -> I
         brand_font = load_font("bold", 50)
         brand_lines = wrap(draw, brand, brand_font, text_width)
 
-    tagline_lines = wrap(draw, tagline, tagline_font, text_width)[:3]
+    # Three lines is the layout's budget; a fourth collides with the domain
+    # strip. The donor silently sliced with `[:3]`, which is how a card ships
+    # reading "...custom image and SVG categories, and" — a sentence that stops
+    # mid-clause, on the one asset nobody proofreads because nobody sees their
+    # own unfurls. Say so instead, loudly, and let the caller shorten the text.
+    all_tagline_lines = wrap(draw, tagline, tagline_font, text_width)
+    tagline_lines = all_tagline_lines[:3]
+    if len(all_tagline_lines) > 3:
+        dropped = " ".join(all_tagline_lines[3:])
+        print(
+            f"[card] WARNING: the tagline does not fit in 3 lines — dropping "
+            f"{dropped!r}.\n"
+            f"[card]          Shorten it to roughly {len(tagline) - len(dropped)} "
+            f"characters, or pass --tagline.",
+            file=sys.stderr,
+        )
 
     brand_lh, tagline_lh = 74, 40
     block_h = (len(brand_lines) * brand_lh) + 26 + (len(tagline_lines) * tagline_lh)
@@ -218,16 +233,18 @@ def main() -> int:
     default_domain = BASE_URL.split("://", 1)[-1].rstrip("/")
 
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    ap.add_argument("--artwork", default=None,
-                    help="source image, transparent PNG. Optional here: this "
-                         "repo has no logo asset, so the default is a "
-                         "text-only card at full width.")
+    ap.add_argument("--artwork", default="assets/brand/cowboy-hat-face.png",
+                    help="source image, transparent PNG (default: %(default)s "
+                         "— the same Noto glyph the header and favicon use). "
+                         "Pass an empty string for a text-only card.")
     ap.add_argument("--brand", default=SITE_BRAND.split(" — ")[0],
                     help="headline (default: the brand, minus its tagline)")
+    # Kept to ~100 characters, which is what fits the three-line budget at this
+    # font size beside the artwork. The other fleet cards sit at 98 and 101.
     ap.add_argument("--tagline",
-                    default="emoji-mart wrapped as a single Dash component — "
-                            "search, skin tones, 22 locales, custom image and "
-                            "SVG categories, and 150+ Iconify icon sets.")
+                    default="emoji-mart as a single Dash component: search, "
+                            "skin tones, 22 locales, custom images and "
+                            "Iconify sets.")
     ap.add_argument("--domain", default=default_domain)
     ap.add_argument("--out", default=None,
                     help="default: build/social-cards/<domain>.png")

@@ -101,8 +101,19 @@ def create_header(data):
                         dmc.Anchor(
                             dmc.Group(
                                 [
+                                    # The site's mark. Same glyph and same
+                                    # family as the favicon and the share card,
+                                    # which are rendered from Noto's U+1F920
+                                    # PNG in assets/brand/ — so the tab icon,
+                                    # this header and an unfurl are one drawing
+                                    # rather than three vendors' idea of it.
+                                    #
+                                    # It was `noto:grinning-face-with-smiling-eyes`
+                                    # — the generic yellow smiley, which is
+                                    # every emoji library's placeholder and
+                                    # named nothing about this one.
                                     DashIconify(
-                                        icon="noto:grinning-face-with-smiling-eyes",
+                                        icon="noto:cowboy-hat-face",
                                         width=28,
                                     ),
                                     dmc.Stack(

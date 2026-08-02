@@ -22,7 +22,7 @@ one most React apps reach for — wrapped as a single Dash component.
 [Changelog](./CHANGELOG.md) ·
 [Discord](https://discord.gg/WEnZR35mrK)
 
-![dash-emoji-mart](./github_assets/0F4D99E2-9ECB-4EE1-A55C-768D7FEE9BEC-ezgif.com-optimize.gif)
+![dash-emoji-mart](https://cdn.2plot.ai/github_assets/github-demo.gif)
 
 </div>
 
