@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <!-- ========================================================================
+         dash-emoji-mart documentation — https://emojimart.2plot.dev
+         ========================================================================
+         TWO rules if you edit this file.
+
+         RULE 1 — do not add per-page metadata here. Two layers already emit it
+         and a static tag can only duplicate them:
+           * Dash, from register_page() via the placeholder below: description,
+             og:title, og:description and the twitter set.
+           * dash-improve-my-llms >= 2.2, whose prerender rewrites the title and
+             injects description, the canonical link, og type/title/description/
+             url, the markdown alternate link and the sitemap link into every
+             browser response.
+         So this file carries only what NEITHER emits: og:site_name,
+         theme-color, keywords/author/robots, the fallback title, the structured
+         data blocks and the noscript body.
+
+         RULE 2 — never write the prerender's marker attribute anywhere in this
+         file, not even inside a comment. The injector's idempotency guard is a
+         substring test over the whole document:
+
+             if MARKER in document: return document
+
+         HTML comments are part of the document. Naming the attribute here
+         silently disables the prerender for every page — no canonical, no og
+         tags, no prerendered body for crawlers — while the site still looks
+         perfectly fine in a browser. This exact mistake was made and caught
+         during the 2.3.3 migration; scripts/verify_network.py now regression-
+         tests for it. Describe the attribute, never spell it.
+
+         The retired shim: a hard-coded canonical link plus a ~40-line
+         pushState monkey-patch used to live here, rewriting canonical and the
+         url meta tags client-side from a hard-coded origin that ignored
+         DASH_EMOJI_MART_BASE_URL. The prerender does that job server-side, per
+         page. Keeping it would have emitted two canonical tags per page.
+         ======================================================================== -->
+
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+
+    <!-- Fallback title. Dash overrides this per page from register_page(title=).
+         Must equal lib.constants.SITE_BRAND — tests/test_site_identity.py pins
+         it, because this is what the served HTML carries if the prerender is
+         ever rolled back with LLMSConfig(prerender=False). -->
+    <title>dash-emoji-mart — emoji picker for Dash</title>
+    <meta name="title" content="dash-emoji-mart — emoji picker for Dash">
+
+    <meta name="keywords" content="dash-emoji-mart, dash emoji picker, emoji-mart dash, plotly dash emoji, python emoji picker, dash custom emoji, iconify dash, emoji component, dash reaction picker">
+    <meta name="author" content="Pip Install Python LLC">
+    <meta name="robots" content="index, follow">
+    <meta name="language" content="English">
+
+    <!-- ========================================================================
+         OPEN GRAPH / TWITTER
+         ========================================================================
+         Only the two tags Dash does NOT emit itself.
+
+         dash.register_page() makes Dash generate per-page og:title, og:type,
+         og:description, og:image and the full twitter:* set on every request
+         (see _page_meta_tags in dash/_pages.py). Declaring those here as well
+         produces two of each, with the static copy describing the site instead
+         of the page — strictly worse than Dash's per-page version.
+
+         og:site_name is genuinely missing from BOTH Dash's set and the
+         prerender's, so it belongs here. og:url does NOT — the prerender emits
+         it per page, pointed at the canonical URL.
+
+         og:image itself is also NOT here. Dash emits it per page from
+         `register_page(image_url=...)` (pages/markdown.py passes
+         lib.constants.OG_IMAGE_URL on every page), and a second static copy
+         would give scrapers two tags to choose between. What IS here is the
+         auxiliary set Dash never emits at all — the secure_url/type/dimensions
+         that let a platform reserve the right box before the image loads, and
+         the alt text.
+
+         These five values MUST match lib/constants.py and the real file on the
+         CDN. A declared size that disagrees with the bytes is worse than
+         declaring nothing, because the platform reserves that box and crops
+         into it; tests/test_social_card.py pins them against the constants and
+         scripts/smoke_live.py reads the live file's IHDR after every deploy.
+         ======================================================================== -->
+
+    <meta property="og:site_name" content="dash-emoji-mart — emoji picker for Dash">
+
+    <meta property="og:image:secure_url" content="https://cdn.2plot.ai/github_assets/emojimart.2plot.dev.png">
+    <meta property="og:image:type" content="image/png">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta property="og:image:alt" content="dash-emoji-mart — emoji picker for Dash">
+
+    <!-- Same rule: Dash emits twitter:card/url/title/description/image per
+         page. Only the alt text is missing from its set. -->
+    <meta name="twitter:image:alt" content="dash-emoji-mart — emoji picker for Dash">
+
+    <!-- Mantine yellow, matching the brand. -->
+    <meta name="theme-color" content="#fab005">
+
+    <!-- ========================================================================
+         STRUCTURED DATA
+         ======================================================================== -->
+
+    <script type="application/ld+json">
+    {
+        "@context": "https://schema.org",
+        "@type": "Organization",
+        "name": "Pip Install Python LLC",
+        "description": "Open-source components and documentation for the Python and Plotly Dash ecosystem.",
+        "url": "https://pip-install-python.com",
+        "sameAs": [
+            "https://github.com/pip-install-python",
+            "https://www.youtube.com/@pipinstallpython",
+            "https://www.linkedin.com/in/austin-k-274140161/"
+        ],
+        "contactPoint": {
+            "@type": "ContactPoint",
+            "email": "austin@pip-install-python.com",
+            "contactType": "customer support"
+        }
+    }
+    </script>
+
+    <script type="application/ld+json">
+    {
+        "@context": "https://schema.org",
+        "@type": "SoftwareSourceCode",
+        "name": "dash-emoji-mart",
+        "description": "An emoji picker for Plotly Dash 4. Wraps emoji-mart as a single Dash component with search, skin tones, 22 locales, custom image/GIF/SVG categories and Iconify icon-set support — the full emoji data set bundled, no runtime requests.",
+        "url": "https://emojimart.2plot.dev/",
+        "codeRepository": "https://github.com/pip-install-python/dash-emoji-mart",
+        "programmingLanguage": ["Python", "JavaScript"],
+        "runtimePlatform": "Python 3.9+",
+        "license": "https://opensource.org/licenses/MIT",
+        "author": {
+            "@type": "Organization",
+            "name": "Pip Install Python LLC",
+            "url": "https://pip-install-python.com"
+        },
+        "isAccessibleForFree": true,
+        "keywords": "dash, emoji, emoji-mart, emoji picker, plotly, python, iconify"
+    }
+    </script>
+
+    <!-- ========================================================================
+         LLM DISCOVERY
+         Consumed by dash-improve-my-llms. Per-page prose is at
+         /<page>/llms.txt; these point at the site-wide entry points.
+         ======================================================================== -->
+
+    <meta name="llms-txt" content="https://emojimart.2plot.dev/llms.txt">
+    <meta name="llms-architecture" content="https://emojimart.2plot.dev/sitemap.xml">
+    <meta name="llms-github-repo" content="https://github.com/pip-install-python/dash-emoji-mart">
+
+    <!-- ========================================================================
+         PERFORMANCE
+         The emoji data set ships INSIDE the component bundle, so a native-set
+         picker fetches nothing. These hosts are only touched by pages that opt
+         into remote artwork: `set="apple"` and friends pull spritesheets from
+         jsDelivr, and the /iconify page pulls SVGs from the Iconify CDN.
+         ======================================================================== -->
+
+    <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+    <link rel="dns-prefetch" href="https://api.iconify.design">
+
+    <!-- Required by Dash. The favicon placeholder serves assets/favicon.ico when
+         present and Dash's own default otherwise. -->
+    {%metas%}
+    {%favicon%}
+    {%css%}
+
+    <!-- ========================================================================
+         NO-JAVASCRIPT FALLBACK
+         ======================================================================== -->
+
+    <noscript>
+        <div style="padding: 24px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 820px; margin: 0 auto; line-height: 1.6;">
+            <h1>dash-emoji-mart</h1>
+            <p><strong>An emoji picker for Plotly Dash 4.</strong></p>
+            <p>
+                Wraps <a href="https://github.com/missive/emoji-mart" style="color:#e67700;">emoji-mart</a>
+                as a single Dash component: search, six skin tones, a frequently-used
+                row, 22 locales, categories of your own images/GIFs/SVGs, and any of
+                Iconify's 150+ icon sets. The emoji data set is bundled inside the
+                component, so the picker works offline and makes no requests of its own.
+            </p>
+
+            <p><strong>The interactive documentation requires JavaScript.</strong>
+               These formats do not:</p>
+
+            <ul style="margin: 20px 0;">
+                <li><a href="/llms.txt" style="color: #e67700;"><strong>llms.txt</strong></a> — the whole site as LLM-friendly markdown</li>
+                <li><a href="/sitemap.xml" style="color: #e67700;"><strong>sitemap.xml</strong></a> — every documentation page</li>
+                <li><a href="/robots.txt" style="color: #e67700;"><strong>robots.txt</strong></a> — crawler instructions</li>
+            </ul>
+
+            <p>Every page also serves its own <code>/&lt;page&gt;/llms.txt</code>
+               containing the prose plus the complete, runnable example source.</p>
+
+            <h2>Install</h2>
+            <pre style="background:#f5f5f5;padding:12px;border-radius:6px;overflow-x:auto;"><code>pip install dash-emoji-mart</code></pre>
+            <p>Requires Python 3.9+ and Dash 4.1+. The compiled JavaScript bundle
+               ships inside the package — no Node, no build step, no
+               <code>external_scripts</code>.</p>
+
+            <h2>Usage</h2>
+            <pre style="background:#f5f5f5;padding:12px;border-radius:6px;overflow-x:auto;"><code>from dash import Dash, callback, html, Input, Output
+from dash_emoji_mart import DashEmojiMart
+
+app = Dash(__name__)
+app.layout = html.Div([
+    DashEmojiMart(id="picker"),
+    html.Div(id="out"),
+])
+
+@callback(Output("out", "children"), Input("picker", "value"))
+def show(value):
+    return value</code></pre>
+
+            <h2>Links</h2>
+            <ul>
+                <li><a href="https://pypi.org/project/dash-emoji-mart/" style="color: #e67700;">PyPI</a></li>
+                <li><a href="https://github.com/pip-install-python/dash-emoji-mart" style="color: #e67700;">GitHub</a></li>
+                <li><a href="https://discord.gg/WEnZR35mrK" style="color: #e67700;">Discord</a></li>
+                <li><a href="https://pip-install-python.com" style="color: #e67700;">Pip Install Python</a></li>
+            </ul>
+        </div>
+    </noscript>
+
+</head>
+<body>
+    {%app_entry%}
+
+    <footer>
+        {%config%}
+        {%scripts%}
+        {%renderer%}
+    </footer>
+</body>
+</html>

@@ -1,0 +1,23 @@
+include README.md
+include LICENSE
+include CHANGELOG.md
+include dash_emoji_mart/dash_emoji_mart.min.js
+include dash_emoji_mart/dash_emoji_mart.min.js.map
+include dash_emoji_mart/dash_emoji_mart.min.js.LICENSE.txt
+include dash_emoji_mart/package-info.json
+recursive-include dash_emoji_mart *.py
+
+# metadata.json is a build-time react-docgen artifact; nothing loads it at
+# runtime. See the note in pyproject.toml [tool.setuptools.package-data].
+exclude dash_emoji_mart/metadata.json
+
+# The documentation site is not part of the distribution.
+prune docs
+prune pages
+prune lib
+prune components
+prune assets
+prune templates
+prune scripts
+prune src
+prune tests

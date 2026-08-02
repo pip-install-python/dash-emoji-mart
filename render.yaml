@@ -1,0 +1,123 @@
+# render.yaml — Render Blueprint for the dash-emoji-mart documentation site.
+# Deploys run.py as a Docker web service, fronted by https://emojimart.2plot.dev.
+# Blueprint spec: https://render.com/docs/blueprint-spec
+#
+# How to deploy:
+#   1. Push this repo (with Dockerfile + render.yaml) to GitHub.
+#   2. Render dashboard → New → Blueprint → select this repo.
+#   3. Render builds the Dockerfile and serves run:server.
+#   4. Add the custom domain emojimart.2plot.dev and point its CNAME at the
+#      service.
+#   5. Register the app on the 2plot network so its traffic series gets a label:
+#      add `emojimart=https://emojimart.2plot.dev/healthz` to PULSE_POLL_TARGETS
+#      on 2plot.ai, and set CROSS_APP_WEBHOOK_SECRET below to the shared value.
+#
+# Local equivalent (no Render needed):
+#   docker build -t dash-emoji-mart-docs .
+#   docker run --rm -p 8050:8050 -e PORT=8050 dash-emoji-mart-docs
+#   open http://localhost:8050
+#
+# NOTE: unlike the dash-leaflet2 sibling this app has NO Clerk auth and no admin
+# control board — every page is public, so there are no CLERK_* variables here.
+services:
+  - type: web
+    name: dash-emoji-mart-docs
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    # Free tier is fine for a docs site, but it sleeps after ~15 min idle and
+    # cold-starts on the next request. Use "starter" or higher for always-on —
+    # note the satellite analytics ledger also lives on the container
+    # filesystem, so evictions cost unreported traffic on free.
+    plan: free
+    # /healthz is the 2plot network convention (lib/health.py) and is excluded
+    # from traffic counts, so it makes a cleaner check than /.
+    healthCheckPath: /healthz
+    autoDeploy: true
+    envVars:
+      # --- Core --------------------------------------------------------
+      # Flask (WSGI) backend, served by gunicorn. Do NOT set fastapi/quart
+      # here: those are ASGI and would need uvicorn instead of gunicorn.
+      - key: DASH_BACKEND
+        value: flask
+      # gunicorn worker processes. 2 is a reasonable default; drop to 1 if the
+      # free tier's 512 MB feels tight. The Dockerfile also runs 4 threads per
+      # worker for callback concurrency.
+      - key: WEB_CONCURRENCY
+        value: "2"
+      # Public origin for canonical URLs, sitemap.xml and llms.txt.
+      #
+      # BOTH names, on purpose (LESSONS §12). `APP_BASE_URL` is the network-wide
+      # spelling every other satellite and every shared script reads, and it
+      # wins; `DASH_EMOJI_MART_BASE_URL` is this repo's original name. Removing
+      # either one from a live service is how a host quietly starts advertising
+      # the wrong canonical origin — so they stay together, one value.
+      - key: APP_BASE_URL
+        value: https://emojimart.2plot.dev
+      - key: DASH_EMOJI_MART_BASE_URL
+        value: https://emojimart.2plot.dev
+
+      # --- 2plot.dev ad network (lib/ad_client.py) ---------------------
+      # Without AD_SERVER_URL reachable the slot simply stays hidden, and a
+      # 60s circuit breaker stops retrying, so an outage never slows a page.
+      - key: AD_SERVER_URL
+        value: https://2plot.dev
+      # This app's identity in the ad network's /admin/ad-board tables.
+      #
+      # "emojimart" — the hub's DIRECTORY KEY, not the PyPI package name. This
+      # said "dash-emoji-mart" while SATELLITE_APP_KEY below already said
+      # "emojimart", so the same app would have arrived at the hub under two
+      # ids and its ad rows would never have lined up with its traffic rows.
+      # STANDARD §5: one short id on every hub surface.
+      - key: AD_APP_ID
+        value: emojimart
+
+      # --- 2plot.dev network bulletin (lib/bulletin.py) ----------------
+      # Hub-published tips and announcements, rendered in the header of the
+      # llms.txt viewer.
+      #
+      # LISTED HERE, BUT THAT IS NOT ENOUGH. Blueprint envVars apply on
+      # Blueprint SYNC, not on git-push autodeploys, so a service created
+      # before this line existed will never pick it up (LESSONS §10). Set it on
+      # the SERVICE in the Render dashboard as well. The symptom of getting
+      # this wrong is one generic tip in the viewer banner where the hub
+      # publishes several — which reads as a styling difference, not as a
+      # missing integration. The boot log says which state the process is in.
+      - key: NETWORK_BULLETIN_URL
+        value: https://2plot.dev/api/network/bulletin
+
+      # --- 2plot.ai satellite analytics (lib/satellite_reporter.py) ----
+      # The shared HMAC secret every satellite holds. Set it in the Render
+      # dashboard (same value as on 2plot.ai) — never in this file.
+      # Without it the app still serves /healthz but reports nothing.
+      - key: CROSS_APP_WEBHOOK_SECRET
+        sync: false
+      # The series this app reports under on 2plot.ai/traffic. "emojimart" is
+      # this app's key in the hub's network directory; the hub labels and
+      # colours the series from it.
+      #
+      # NOTE the variable name: SATELLITE_APP_KEY, not the SATELLITE_APP_ID the
+      # retired satellite_analytics.py read. lib/satellite_reporter.py (copied
+      # from the boilerplate) reads APP_KEY and defaulted to "boilerplate" —
+      # so a deployment that kept the old variable name would have reported
+      # this app's traffic as the boilerplate's and overwritten its rows.
+      - key: SATELLITE_APP_KEY
+        value: emojimart
+      # Seconds between rollup POSTs. The contract asks for hourly; 1800 halves
+      # what a free-tier eviction can swallow.
+      - key: SATELLITE_REPORT_INTERVAL_S
+        value: "1800"
+      # The visitor ledger traffic_rollup reads. On the free tier the container
+      # filesystem is ephemeral, so a mid-day deploy resets it and the next
+      # report overwrites today's real total with whatever accumulated since
+      # the restart. Point this at a mounted disk on a paid plan.
+      - key: TRAFFIC_ANALYTICS_FILE
+        value: /tmp/visitor_analytics.json
+
+      # --- Iconify (dash_emoji_mart.iconify) ---------------------------
+      # The /iconify page builds its categories at import time and caches the
+      # API responses for 24h. On the free tier the filesystem is ephemeral, so
+      # this refills after each cold start — a handful of requests, not a
+      # problem. Point it at a persistent disk to avoid even that.
+      - key: DASH_EMOJI_MART_CACHE_DIR
+        value: /tmp/iconify-cache

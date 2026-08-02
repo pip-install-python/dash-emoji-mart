@@ -1,0 +1,61 @@
+{
+  "name": "dash_emoji_mart",
+  "version": "0.2.1",
+  "description": "emoji-mart for Dash — a full-featured emoji picker component with custom emoji categories and Iconify icon-set support.",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/pip-install-python/dash-emoji-mart.git"
+  },
+  "bugs": {
+    "url": "https://github.com/pip-install-python/dash-emoji-mart/issues"
+  },
+  "homepage": "https://emojimart.2plot.dev",
+  "main": "src/lib/index.js",
+  "scripts": {
+    "build:js::dev": "webpack --mode development",
+    "build:js": "webpack --mode production",
+    "build:backends": "dash-generate-components ./src/lib/components dash_emoji_mart -p package-info.json --ignore \\.test\\.",
+    "build": "npm run build:js && npm run build:backends",
+    "watch": "npm run build:js::dev -- --watch"
+  },
+  "author": "Pip Install Python LLC <pipinstallpython@gmail.com>",
+  "license": "MIT",
+  "dependencies": {
+    "@emoji-mart/data": "^1.2.1",
+    "@emoji-mart/react": "^1.1.1",
+    "emoji-mart": "^5.6.0"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.22.1",
+    "@babel/plugin-proposal-object-rest-spread": "^7.20.7",
+    "@babel/preset-env": "^7.22.2",
+    "@babel/preset-react": "^7.22.3",
+    "@plotly/dash-component-plugins": "^1.2.3",
+    "@plotly/webpack-dash-dynamic-import": "^1.2.0",
+    "babel-eslint": "^10.1.0",
+    "babel-loader": "^9.1.2",
+    "copyfiles": "^2.1.1",
+    "css-loader": "^6.8.1",
+    "eslint": "^6.0.1",
+    "eslint-config-prettier": "^6.0.0",
+    "eslint-plugin-import": "^2.18.0",
+    "eslint-plugin-react": "^7.14.2",
+    "prop-types": "^15.8.1",
+    "react": "^18.3.1",
+    "react-docgen": "^5.4.3",
+    "react-dom": "^18.3.1",
+    "style-loader": "^3.3.3",
+    "styled-jsx": "^5.1.2",
+    "webpack": "^5.84.1",
+    "webpack-cli": "^5.1.1",
+    "webpack-dev-server": "^4.15.0"
+  },
+  "peerDependencies": {
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0"
+  },
+  "engines": {
+    "node": ">=16",
+    "npm": ">=8"
+  }
+}

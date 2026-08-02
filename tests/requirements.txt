@@ -1,0 +1,13 @@
+# Packages needed to run tests/.
+#
+# These tests are deliberately browser-free: they exercise the generated
+# component class and the iconify loader, with the Iconify API stubbed out via
+# monkeypatch so nothing here touches the network. No selenium, no chromedriver.
+#
+# The documentation site is covered separately by scripts/smoke_test.py, which
+# needs the docs requirements (../requirements.txt) instead.
+#
+#     pip install -r tests/requirements.txt && pytest
+
+pytest>=7
+dash>=4.1
