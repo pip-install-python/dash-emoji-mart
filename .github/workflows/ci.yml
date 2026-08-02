@@ -1,0 +1,440 @@
+name: CI
+
+# Every PR runs the smoke suite against the full supported Dash range.
+# pyproject declares `dash>=4.1`; this is what keeps that claim honest.
+#
+# NO `push:` TRIGGER, deliberately. cd.yml owns `main` and calls this workflow
+# through `uses:`, so a push to main runs this matrix exactly once. Adding
+# `push: [main]` back would run everything twice on every merge — LESSONS §15.
+on:
+  pull_request:
+  workflow_dispatch:
+  workflow_call:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+# TWO different Python floors, deliberately:
+#
+#   * the PACKAGE needs >= 3.9 — `dash` 4.4.1 itself requires 3.9, and that is
+#     what `requires-python` in pyproject.toml promises. Verified by the
+#     `package` and `package-python-range` jobs, which install the wheel with
+#     nothing but Dash.
+#   * the DOCS SITE needs >= 3.10 — `python-frontmatter` 1.3 imports
+#     `typing.TypeGuard`, which is 3.10+. That constrains the docs site only.
+#
+# So the smoke job never runs below 3.10, and the package jobs never install
+# the docs requirements.
+jobs:
+  # actionlint FIRST, always. A double quote inside a `${{ }}` expression is a
+  # lex error that yields ZERO jobs and no failure signal — the boilerplate lost
+  # four days of green-looking silence to exactly that (LESSONS §14). A workflow
+  # that does not parse cannot report that it did not parse.
+  lint-workflows:
+    name: actionlint
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run actionlint
+        run: |
+          bash <(curl -fsSL https://raw.githubusercontent.com/rhysd/actionlint/main/scripts/download-actionlint.bash)
+          ./actionlint -color
+
+  smoke:
+    name: Docs · Dash ${{ matrix.dash }} · Python ${{ matrix.python }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # The floor, the two intermediate minors, and the current release.
+        dash: ["4.1.0", "4.2.0", "4.3.0", "4.4.1"]
+        python: ["3.12"]
+        include:
+          # The docs-site Python range, against the current Dash. A full
+          # cross-product would be 12 jobs for very little extra signal.
+          - dash: "4.4.1"
+            python: "3.10"
+          - dash: "4.4.1"
+            python: "3.13"
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+          cache: pip
+
+      # node is what makes the clientside-JS syntax check real. Without it the
+      # smoke test SKIPS that check rather than failing, so a broken
+      # clientside_callback would sail straight through.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install Dash ${{ matrix.dash }} first
+        # Install the version under test BEFORE the rest, so the other
+        # requirements resolve against it rather than dragging in a newer Dash.
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install "dash[fastapi]==${{ matrix.dash }}"
+
+      - name: Install documentation-site requirements
+        # The pinned Dash line is stripped so it cannot override the matrix
+        # version. `-e .` on the next line installs the component itself from
+        # the working tree, which is the build this run is meant to exercise.
+        #
+        # markdown2dash installs separately with --no-deps: it pins
+        # `gunicorn>=21.2.0,<22.0.0`, which cannot resolve against the CVE-driven
+        # `gunicorn>=23` floor in requirements.txt. See the note there; the
+        # gunicorn assertion in the container job is what keeps the dodge honest.
+        run: |
+          grep -v 'COMPAT-MATRIX: dash' requirements.txt > /tmp/reqs.txt
+          python -m pip install -r /tmp/reqs.txt
+          python -m pip install --no-deps markdown2dash==0.1.2
+
+      - name: Assert the security floors resolved
+        # A resolver that quietly walked gunicorn back under markdown2dash's
+        # ceiling, or dimll below the identity floor, must fail here rather
+        # than at a deploy.
+        run: |
+          python - <<'PY'
+          from importlib.metadata import version
+
+          def parts(v):
+              return tuple(int(p) for p in v.split(".")[:3] if p.isdigit())
+
+          gunicorn_v = version("gunicorn")
+          dimll_v = version("dash-improve-my-llms")
+          print(f"gunicorn {gunicorn_v} · dash-improve-my-llms {dimll_v}")
+          assert parts(gunicorn_v)[:2] >= (23, 0), (
+              f"gunicorn {gunicorn_v} is under the CVE floor — markdown2dash's "
+              "spurious <22 pin won"
+          )
+          assert parts(dimll_v) >= (2, 3, 4), (
+              f"dash-improve-my-llms {dimll_v} predates resolve_site_title"
+          )
+          PY
+
+      - name: Report the resolved Dash version
+        # A silent upgrade here would make the whole matrix meaningless.
+        run: |
+          RESOLVED=$(python -c "import dash; print(dash.__version__)")
+          echo "requested=${{ matrix.dash }} resolved=$RESOLVED"
+          if [ "$RESOLVED" != "${{ matrix.dash }}" ]; then
+            echo "::warning::Dash resolved to $RESOLVED, not ${{ matrix.dash }}"
+          fi
+
+      - name: Tests — package and site, secretless
+        # SECRETLESS ON PURPOSE (LESSONS §18): no env is provided, which is what
+        # proves every integration fails closed. The bulletin stays off, the
+        # traffic reporter never starts a thread, and the ad slot hides itself.
+        #
+        # This job installs requirements.txt, so the SITE suite runs here in
+        # full. The package-only jobs below install just the wheel, and the site
+        # modules guard themselves with `pytest.importorskip` so they skip there
+        # rather than failing on an import error that says nothing about the
+        # package (LESSONS §19).
+        #
+        # `tests/` is NOT a package — the __init__.py was removed in this pass so
+        # `from conftest import ...` resolves, which is how every shared network
+        # test in the fleet imports its fixtures.
+        run: |
+          python -m pip install pytest
+          python -m pytest tests/ -q
+
+      - name: Smoke test
+        run: python scripts/smoke_test.py --json smoke-${{ matrix.dash }}-py${{ matrix.python }}.json
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: smoke-${{ matrix.dash }}-py${{ matrix.python }}
+          path: smoke-*.json
+          if-no-files-found: ignore
+
+  bundle:
+    name: Rebuild the JS bundle from source
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install toolchains
+        run: |
+          npm ci
+          python -m pip install --upgrade pip
+          python -m pip install "dash==4.4.1" pyyaml
+
+      # The committed bundle is what ships. This proves it can still be
+      # produced from src/ — a bundle that only exists because someone built it
+      # once on a laptop is a bundle nobody can reproduce.
+      - name: npm run build
+        run: npm run build
+
+      - name: The rebuild must not change the committed component class
+        # The bundle itself is not byte-reproducible (webpack embeds paths and
+        # hashes), but the GENERATED Python class is: a diff here means src/ and
+        # the committed dash_emoji_mart/DashEmojiMart.py have drifted apart.
+        run: |
+          if ! git diff --exit-code -- dash_emoji_mart/DashEmojiMart.py dash_emoji_mart/_imports_.py; then
+            echo "::error::src/ no longer matches the committed component class."
+            echo "Run 'npm run build' and commit dash_emoji_mart/."
+            exit 1
+          fi
+
+  package:
+    name: Build + verify the wheel
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # check_release.py compares the git commit times of the bundle and
+          # src/. A shallow clone can omit the commit that last touched one of
+          # them, turning the check into a false "no git history" skip.
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Release consistency
+        # Version drift across the four version sources, a stale bundle,
+        # packaging leaks, an empty LICENSE. None of these break a test run.
+        run: python scripts/check_release.py
+
+      - name: Build
+        run: |
+          python -m pip install --upgrade pip build twine
+          python -m build
+
+      - name: Check metadata
+        run: python -m twine check dist/*
+
+      - name: Install the wheel in a clean venv and import it
+        # The package must work with ONLY `dash` present — nothing from
+        # requirements.txt, which is the docs site's dependency set.
+        #
+        # `cd /tmp` is load-bearing. `python -` puts the CURRENT DIRECTORY on
+        # sys.path, so running this from the checkout would import the working
+        # tree's dash_emoji_mart/ — complete with the gitignored metadata.json
+        # and every docs directory — and the leak assertions below would test
+        # the repo instead of the wheel. Verified: it fails there and passes here.
+        run: |
+          python -m venv /tmp/clean
+          /tmp/clean/bin/pip install --upgrade pip
+          /tmp/clean/bin/pip install "$GITHUB_WORKSPACE"/dist/*.whl
+          cd /tmp
+          /tmp/clean/bin/python - <<'PY'
+          import pathlib
+
+          import dash_emoji_mart as dem
+
+          pkg = pathlib.Path(dem.__file__).parent
+          assert "site-packages" in str(pkg), f"not the installed wheel: {pkg}"
+          print("version:", dem.__version__, "from", pkg)
+
+          bundle = pkg / "dash_emoji_mart.min.js"
+          assert bundle.exists(), "JS bundle missing from the wheel"
+          print("bundle:", bundle.stat().st_size // 1024, "KB")
+
+          # The react-docgen artifact must NOT ship.
+          assert not (pkg / "metadata.json").exists(), "metadata.json leaked into the wheel"
+
+          # Neither must the documentation site.
+          for leaked in ("docs", "pages", "components", "templates", "src"):
+              assert not (pkg.parent / leaked).is_dir(), f"{leaked}/ leaked into the wheel"
+
+          assert dem.__all__ == ["DashEmojiMart"], dem.__all__
+
+          props = dem.DashEmojiMart(id="probe").available_properties
+          for name in ("value", "selectedEmoji", "clickedOutside", "custom",
+                       "categoryIcons", "persistence", "className", "style"):
+              assert name in props, f"missing prop: {name}"
+          print(f"components OK · {len(props)} props")
+
+          # The iconify cache must never be written inside site-packages.
+          from dash_emoji_mart.iconify import _cache_dir
+          assert not str(_cache_dir()).startswith(str(pkg)), _cache_dir()
+          print("iconify cache dir:", _cache_dir())
+          PY
+
+      - name: Assert the wheel version matches pyproject
+        run: |
+          PY_VER=$(python -c "import re;print(re.search(r'^version = \"([^\"]+)\"', open('pyproject.toml').read(), re.M).group(1))")
+          WHEEL_VER=$(cd /tmp && /tmp/clean/bin/python -c "import dash_emoji_mart;print(dash_emoji_mart.__version__)")
+          echo "pyproject=$PY_VER  installed=$WHEEL_VER"
+          test "$PY_VER" = "$WHEEL_VER"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+  package-python-range:
+    name: Package · Python ${{ matrix.python }}
+    needs: package
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # Every interpreter `requires-python` in pyproject.toml claims. This is
+        # what makes that claim measured rather than asserted — and it installs
+        # ONLY the wheel plus Dash, never the docs requirements, because the
+        # package's floor is not the docs site's.
+        python: ["3.9", "3.10", "3.11", "3.12", "3.13"]
+    steps:
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+      - name: Install the wheel (pulls in dash, nothing else)
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install dist/*.whl
+
+      - name: Import and build a layout
+        run: |
+          python - <<'PY'
+          import dash
+          import dash_emoji_mart as dem
+          from dash import Dash, html
+          from dash._utils import to_json
+
+          app = Dash(__name__)
+          app.layout = html.Div([
+              dem.DashEmojiMart(
+                  id="picker",
+                  perLine=8,
+                  theme="dark",
+                  custom=[{
+                      "id": "team",
+                      "name": "Team",
+                      "emojis": [{
+                          "id": "logo",
+                          "name": "Logo",
+                          "skins": [{"src": "https://example.com/logo.png"}],
+                          "native": "",
+                          "unified": "custom",
+                      }],
+                  }],
+                  categoryIcons={"team": {"svg": "<svg/>"}},
+                  persistence=True,
+              ),
+          ])
+          to_json(app.layout)
+          print(f"dash={dash.__version__} dash_emoji_mart={dem.__version__} OK")
+          PY
+
+  # --------------------------------------------------------------------------
+  # The deploy gate. CI green does NOT mean the image boots — LESSONS §19.
+  #
+  # The llms satellite added a top-level `lib/` directory, passed every test
+  # (they run from the working tree), and died at gunicorn boot because the
+  # Dockerfile's COPY list never gained it. This repo copies the whole tree
+  # (`COPY . .`), so that specific trap is closed by construction — but a
+  # .dockerignore entry can exclude a new directory just as effectively, and
+  # only building and booting the real image proves otherwise.
+  #
+  # This job also asserts the dependency fingerprints INSIDE the image, which is
+  # the only place the markdown2dash `--no-deps` dodge can be verified honestly.
+  # --------------------------------------------------------------------------
+  container:
+    name: Build the image, boot it, battery it
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Build the production image
+        run: docker build -t emojimart-docs:ci .
+
+      - name: Assert the dependency fingerprints inside the image
+        run: |
+          docker run --rm emojimart-docs:ci python - <<'PY'
+          from importlib.metadata import version
+
+          def parts(v):
+              return tuple(int(p) for p in v.split(".")[:3] if p.isdigit())
+
+          gunicorn_v = version("gunicorn")
+          dimll_v = version("dash-improve-my-llms")
+
+          # markdown2dash must be importable despite being installed --no-deps:
+          # if any of its real runtime dependencies is missing from
+          # requirements.txt, the docs site cannot render a single page and the
+          # failure would otherwise appear as a boot crash on Render.
+          import markdown2dash  # noqa: F401
+
+          print(f"gunicorn {gunicorn_v} · dash-improve-my-llms {dimll_v}")
+          assert parts(gunicorn_v)[:2] >= (23, 0), (
+              f"image has gunicorn {gunicorn_v}; markdown2dash's <22 pin won"
+          )
+          assert parts(dimll_v) >= (2, 3, 4), (
+              f"image has dash-improve-my-llms {dimll_v}, below the network floor"
+          )
+          PY
+
+      - name: Boot the container
+        # Secretless, like the test job: this is also the proof that the image
+        # serves a working site with no configuration at all.
+        run: |
+          docker run -d --name emojimart -p 8050:8050 -e PORT=8050 emojimart-docs:ci
+          for _ in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:8050/healthz > /dev/null; then
+              echo "container is healthy"
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "::error::the container never answered /healthz"
+          docker logs emojimart
+          exit 1
+
+      - name: /healthz returns ok:true
+        # The battery asserts that exact field; a 200 carrying different JSON
+        # is a deploy-blocking "unhealthy" (LESSONS §11).
+        run: |
+          curl -fsS http://127.0.0.1:8050/healthz | tee /tmp/healthz.json
+          python -c "import json,sys; d=json.load(open('/tmp/healthz.json')); sys.exit(0 if d.get('ok') is True else 1)"
+
+      - name: Network smoke battery against the container
+        run: |
+          python -m pip install requests
+          python scripts/network_smoke.py --base-url http://127.0.0.1:8050
+
+      - name: Container logs
+        if: always()
+        run: docker logs emojimart || true
+
+  # pip-audit is advisory: a fresh advisory against a transitive dependency
+  # must not block a documentation deploy, but it should be visible.
+  audit:
+    name: pip-audit (advisory)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: |
+          python -m pip install --upgrade pip pip-audit
+          python -m pip install -r requirements.txt
+          python -m pip install --no-deps markdown2dash==0.1.2
+          pip-audit --strict --progress-spinner=off || true

@@ -1,0 +1,54 @@
+# --- Python -----------------------------------------------------------------
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.venv/
+venv/
+env/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# --- Node -------------------------------------------------------------------
+node_modules/
+npm-debug.log*
+yarn-error.log*
+.build_cache
+
+# The webpack bundle under dash_emoji_mart/ is COMMITTED on purpose: it is what
+# `pip install dash-emoji-mart` ships, and the Docker image builds without Node
+# because of it. Do not add dash_emoji_mart/*.js here.
+
+# `dash-generate-components` writes this react-docgen dump next to the bundle.
+# Nothing loads it at runtime and it is excluded from the wheel, so it stays out
+# of git too.
+dash_emoji_mart/metadata.json
+
+# --- Runtime state ----------------------------------------------------------
+# dash_emoji_mart.iconify memoises Iconify API responses here for 24h.
+.iconify_cache/
+
+# lib/satellite_analytics.py's traffic ledger, plus its per-interval claim
+# files. Written on every run, including scripts/smoke_test.py.
+satellite_traffic.jsonl
+.satellite_traffic.jsonl.*
+
+# --- Local config -----------------------------------------------------------
+.env
+.env.local
+
+# --- Editors / OS -----------------------------------------------------------
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+
+# lib/analytics_tracker.py ledger (TRAFFIC_ANALYTICS_FILE overrides the path).
+visitor_analytics.json
+visitor_analytics.json.lock
+
+# Claude Code session scratch (screenshots, transcripts) — never the repo's business.
+.claude/

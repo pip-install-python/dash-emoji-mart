@@ -1,0 +1,35 @@
+# Keep the image small and the build cache stable. The committed
+# dash_emoji_mart/ bundle is what the app serves, so none of the JS toolchain
+# needs to reach the container.
+.git/
+.github/
+.venv/
+venv/
+node_modules/
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+
+# JS sources + toolchain — the bundle is pre-built and committed.
+src/
+webpack.config.js
+package-lock.json
+.babelrc
+.eslintrc
+.prettierrc
+.pylintrc
+
+# Local state and secrets
+.env
+.env.*
+satellite_traffic.jsonl
+.satellite_traffic.jsonl.*
+.iconify_cache/
+
+# Editor / OS
+.idea/
+.vscode/
+.DS_Store
+.claude/
