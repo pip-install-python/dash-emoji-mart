@@ -59,6 +59,7 @@ from lib.constants import (
     SITE_BRAND,
     SITE_DESCRIPTION,
     SITE_TITLE,
+    require_owned_base_url,
 )
 
 # ----------------------------------------------------------------------------
@@ -81,8 +82,14 @@ from lib.constants import (
 # which is how a stale interpreter went unnoticed here: a server started before
 # the venv was rebuilt keeps its already-imported 2.0.0 in memory and happily
 # serves the stub. Version drift this consequential should announce itself.
+#
+# 2.5.1 is the network's 402-instrumentation floor (1.3.x sync): it adds
+# `configure_access` / `configure_viewer_identity` — what lib/access.py hands
+# the tier policy to — and the tiered corpus documents (/llms-small.txt,
+# /llms-full.txt) that the LLMS_SMALL_TIER / LLMS_FULL_TIER knobs govern.
+# Below it the tier registrations further down are dead code and nothing says so.
 # ----------------------------------------------------------------------------
-_DIMLL_FLOOR = (2, 3, 4)
+_DIMLL_FLOOR = (2, 5, 1)
 
 
 def _check_dimll_version() -> str:
@@ -165,6 +172,10 @@ app._backend_info = BACKEND_INFO
 # ----------------------------------------------------------------------------
 # AI/LLM & SEO configuration
 # ----------------------------------------------------------------------------
+# Public origin. Drives <link rel="canonical">, sitemap.xml and the absolute
+# URLs in llms.txt — see lib/constants.py for why a production boot that never
+# set its origin explicitly must refuse rather than claim this repo's default.
+require_owned_base_url()
 app._base_url = BASE_URL
 # block_ai_training=True is the network-wide posture, and on 2.3.2/2.3.3 it is
 # finally the safe one. The taxonomy was corrected so True disallows the genuine
@@ -298,6 +309,30 @@ print(
     "[dash-emoji-mart] network bulletin: off — set NETWORK_BULLETIN_URL="
     f"{_bulletin.HUB_BULLETIN_URL} to render the hub's announcements"
 )
+
+# ----------------------------------------------------------------------------
+# Access control (dash-improve-my-llms 2.5+). Reads the tiers the pages just
+# declared, so it must run after they are registered and before the routes are
+# attached. Stays OFF unless some page declares a non-public tier — every page
+# here is public today, so this wiring is inert instrumentation: it exists so
+# the 402 experiment can tighten the corpus documents per-satellite via env
+# (or the hub's page-tier ceilings) with no code change here. The policy and
+# the reasoning live in lib/access.py.
+# ----------------------------------------------------------------------------
+from lib import access as _access  # noqa: E402
+from lib import page_tiers as _page_tiers  # noqa: E402
+
+# Tiered corpus documents (dash-improve-my-llms >= 2.4.0). Pseudo-paths:
+# they never enter dash.page_registry, so they cannot leak into listings —
+# registering them here lets this satellite tier its compact briefing and
+# full corpus via env (LLMS_SMALL_TIER / LLMS_FULL_TIER; unset = the
+# default tier, i.e. public), and the hub can tighten either network-wide
+# through its page-tier ceilings with no redeploy here. Inert on older
+# package versions.
+_page_tiers.register("/llms-small.txt", os.environ.get("LLMS_SMALL_TIER"))
+_page_tiers.register("/llms-full.txt", os.environ.get("LLMS_FULL_TIER"))
+
+ACCESS_ENABLED = _access.configure()
 
 # /llms.txt, /<page>/llms.txt, /robots.txt, /sitemap.xml, the universal
 # prerender and the bot middleware. dash-improve-my-llms auto-detects the

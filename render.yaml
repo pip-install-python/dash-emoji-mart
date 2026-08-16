@@ -25,11 +25,12 @@ services:
     runtime: docker
     dockerfilePath: ./Dockerfile
     dockerContext: .
-    # Free tier is fine for a docs site, but it sleeps after ~15 min idle and
-    # cold-starts on the next request. Use "starter" or higher for always-on —
-    # note the satellite analytics ledger also lives on the container
-    # filesystem, so evictions cost unreported traffic on free.
-    plan: free
+    # Starter, not free (upgraded 2026-08-16 for the x402 instrumentation
+    # window): the free tier sleeps after ~15 min idle, cold-starts on the next
+    # request, and its evictions wipe the analytics ledger mid-day — 30 days of
+    # crawl data is exactly what the network's 402 decision reads, so the data
+    # must survive the container. The disk below is the other half of that.
+    plan: starter
     # /healthz is the 2plot network convention (lib/health.py) and is excluded
     # from traffic counts, so it makes a cleaner check than /.
     healthCheckPath: /healthz
@@ -107,17 +108,39 @@ services:
       # what a free-tier eviction can swallow.
       - key: SATELLITE_REPORT_INTERVAL_S
         value: "1800"
-      # The visitor ledger traffic_rollup reads. On the free tier the container
-      # filesystem is ephemeral, so a mid-day deploy resets it and the next
-      # report overwrites today's real total with whatever accumulated since
-      # the restart. Point this at a mounted disk on a paid plan.
+      # Access tier for the tiered corpus documents (/llms-small.txt and
+      # /llms-full.txt — dash-improve-my-llms >= 2.4.0). Deliberately set to
+      # the default here so every fork SEES the knob: the 402 experiment
+      # tightens the full corpus by flipping this to `auth`, per satellite,
+      # with no code change. See .env.example for the tier values.
+      - key: LLMS_SMALL_TIER
+        value: public
+      - key: LLMS_FULL_TIER
+        value: public
+
+      # The visitor ledger traffic_rollup reads. The hub takes the LAST report
+      # for a given (app, date), so an ephemeral ledger is not merely lossy —
+      # a mid-day deploy wipes it and the next hourly report OVERWRITES the
+      # day's real total with whatever accrued since the restart. /tmp is
+      # wiped on every deploy even on a paid plan, which is why this points at
+      # the mounted disk below.
       - key: TRAFFIC_ANALYTICS_FILE
-        value: /tmp/visitor_analytics.json
+        value: /var/data/visitor_analytics.json
 
       # --- Iconify (dash_emoji_mart.iconify) ---------------------------
       # The /iconify page builds its categories at import time and caches the
-      # API responses for 24h. On the free tier the filesystem is ephemeral, so
-      # this refills after each cold start — a handful of requests, not a
-      # problem. Point it at a persistent disk to avoid even that.
+      # API responses for 24h. Now that the analytics disk exists the cache
+      # rides along on it — /tmp is wiped on every deploy, and refilling from
+      # the Iconify API on each boot was only ever tolerated for want of a
+      # persistent directory.
       - key: DASH_EMOJI_MART_CACHE_DIR
-        value: /tmp/iconify-cache
+        value: /var/data/iconify-cache
+
+    # 1 GB at /var/data — the analytics ledger's home. Copied from the
+    # boilerplate's render.yaml: without it TRAFFIC_ANALYTICS_FILE above sits
+    # on the container filesystem and every deploy erases the day's ledger
+    # (see that variable's comment for why the hub then keeps the wrong total).
+    disk:
+      name: analytics
+      mountPath: /var/data
+      sizeGB: 1

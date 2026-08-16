@@ -62,11 +62,16 @@ python-frontmatter
 # server-side (2.2/2.3 — which is why templates/index.html no longer carries a
 # canonical shim), and the corrected AI-crawler taxonomy (2.3.2/2.3.3).
 #
-# 2.3.4 is the network floor. It adds `resolve_site_title`, which is what makes
-# the /llms.txt H1 and the llms viewer's brand chip read SITE_BRAND instead of
-# falling back to a nav label or Dash's own default — a site below this floor
-# publishes an identity it never chose, and nothing looks broken.
-dash-improve-my-llms[flask]>=2.3.4
+# 2.3.4 was the previous network floor (`resolve_site_title` — the /llms.txt
+# H1 and the llms viewer's brand chip read SITE_BRAND instead of a fallback).
+#
+# 2.5.1 is the 402-instrumentation floor (network 1.3.x sync). It adds
+# `configure_access` / `configure_viewer_identity` — the hooks lib/access.py
+# hands the page-tier policy to — and the tiered corpus documents
+# (/llms-small.txt, /llms-full.txt) that LLMS_SMALL_TIER / LLMS_FULL_TIER
+# govern. Below it the tier wiring in run.py is dead code and nothing says so;
+# run.py enforces this same floor at boot for exactly that reason.
+dash-improve-my-llms[flask]>=2.5.1
 python-dotenv>=1.0
 pydantic>=2.0
 requests>=2.31

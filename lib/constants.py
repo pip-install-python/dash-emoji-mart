@@ -139,6 +139,49 @@ BASE_URL = (
     or DEFAULT_BASE_URL
 ).rstrip("/")
 
+
+def require_owned_base_url(base_url: str = BASE_URL) -> None:
+    """Fail fast in production when BASE_URL isn't this app's real origin.
+
+    Only enforced when a hosting platform is detected (Render sets ``RENDER``;
+    ``APP_ENV=production`` works anywhere else), so local development and the
+    test suite are unaffected.
+
+    Two failures are caught:
+
+    1. **No base-URL env set in production.** A fork of this repo inherits
+       ``DEFAULT_BASE_URL`` and quietly claims https://emojimart.2plot.dev as
+       its canonical origin — Google then treats the fork as the original's
+       duplicate, or worse, the other way around. There is no safe guess to
+       make on a fork's behalf, so this raises. Either env name satisfies the
+       check, because this repo honours both (see the block above).
+    2. **A platform-generated hostname.** ``*.onrender.com`` /
+       ``*.herokuapp.com`` still resolve after a custom domain is attached, so
+       canonicals pointing there split link equity across two hostnames for as
+       long as nobody notices.
+    """
+    in_production = bool(os.environ.get("RENDER") or os.environ.get("APP_ENV") == "production")
+    if not in_production:
+        return
+
+    if not (os.environ.get("APP_BASE_URL") or os.environ.get("DASH_EMOJI_MART_BASE_URL")):
+        raise RuntimeError(
+            "APP_BASE_URL is not set. This app would serve "
+            f"<link rel='canonical' href='{DEFAULT_BASE_URL}'> on every page, "
+            "telling search engines it is a duplicate of dash-emoji-mart's "
+            "documentation site. Set APP_BASE_URL to this deployment's real "
+            "origin (e.g. https://emojimart.2plot.dev)."
+        )
+
+    for platform_host in ("onrender.com", "herokuapp.com", "railway.app", "fly.dev"):
+        if platform_host in base_url:
+            raise RuntimeError(
+                f"APP_BASE_URL={base_url!r} is a platform-generated hostname. "
+                "Canonical tags, sitemap.xml and llms.txt would all point at it "
+                "instead of the custom domain, splitting link equity across two "
+                "hosts. Set APP_BASE_URL to the public domain."
+            )
+
 # ---------------------------------------------------------------------------
 # The social card
 # ---------------------------------------------------------------------------

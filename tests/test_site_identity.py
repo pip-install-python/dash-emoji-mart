@@ -150,16 +150,18 @@ def test_llms_package_floor_is_the_network_standard():
     import dash_improve_my_llms as pkg
 
     parts = tuple(int(p) for p in pkg.__version__.split(".")[:3] if p.isdigit())
-    assert parts >= (2, 3, 4), (
-        f"dash-improve-my-llms {pkg.__version__} predates resolve_site_title; "
-        "the viewer chip and the /llms.txt H1 would fall back to app.title"
+    assert parts >= (2, 5, 1), (
+        f"dash-improve-my-llms {pkg.__version__} is below the network's "
+        "402-instrumentation floor; the tier wiring in run.py would be dead "
+        "code and the prerender's title handling reverts to the pre-2.5 "
+        "override this suite used to pin"
     )
 
 
 def test_the_requirements_floor_matches():
     """The installed version proves nothing about what CI or Render installs."""
     reqs = (REPO_ROOT / "requirements.txt").read_text()
-    assert "dash-improve-my-llms[flask]>=2.3.4" in reqs
+    assert "dash-improve-my-llms[flask]>=2.5.1" in reqs
 
 
 # ---------------------------------------------------------------------------
@@ -197,46 +199,25 @@ def test_no_share_card_tag_is_empty(client):
 
 
 def test_dash_emits_the_prefixed_title(client):
-    """Dash's own og:title carries PAGE_TITLE_PREFIX.
+    """The scraper-winning og:title carries PAGE_TITLE_PREFIX.
 
-    This is the tag the prefix exists for. It is NOT the last og:title in the
-    document — see the next test — but it must be present and correct, because
-    it is what a scraper reading the first tag, and what Google's title
-    heuristics, will find.
+    RE-MEASURED 2026-08-16 on dash-improve-my-llms 2.5.1 (the 1.3.x sync's
+    floor): the prerender no longer appends its own bare-name og:title, so the
+    document now carries exactly one, and it is Dash's prefixed tag —
+    "dash-emoji-mart | Picker in a Popover". The 2.3.4-era pin that documented
+    the old override (`test_measured_upstream_the_prerender_overrides_dash_title`)
+    failed on the upgrade exactly as its docstring predicted and was deleted
+    per its own instructions; this test is the tightened survivor. Scrapers
+    take the LAST tag of a kind, so the last one is the one that must carry
+    the prefix.
     """
     html = client.get(A_REAL_PAGE).text
     titles = re.findall(
         r'<meta[^>]*property="og:title"[^>]*content="([^"]*)"', html
     )
     assert titles, f"no og:title on {A_REAL_PAGE}"
-    assert any(t.startswith(PAGE_TITLE_PREFIX) for t in titles), (
-        f"no og:title carries {PAGE_TITLE_PREFIX!r}; got {titles!r}"
-    )
-
-
-def test_measured_upstream_the_prerender_overrides_dash_title(client):
-    """MEASURED 2026-08-01, dash-improve-my-llms 2.3.4 — not a repo bug.
-
-    `prerender.build_head_tags` appends its OWN `og:title` from the page's
-    registered `name`, and `_TITLE_RE.sub` rewrites `<title>` to the same
-    value. Both therefore lose PAGE_TITLE_PREFIX, on every page of every
-    satellite in the fleet — so `<title>` and the scraper-winning og:title read
-    "Picker in a Popover" rather than "dash-emoji-mart | Picker in a Popover".
-
-    Registering the prefixed string as `name` would fix the tags and wreck the
-    `## Pages` index in /llms.txt, which lists that same `name` inside a
-    document already headed by SITE_BRAND. So this repo leaves the name clean
-    and pins the CURRENT behaviour here instead.
-
-    This test failing is good news: it means a dimll upgrade changed the
-    override. Re-measure, then delete this test and tighten the one above.
-    """
-    html = client.get(A_REAL_PAGE).text
-    titles = re.findall(
-        r'<meta[^>]*property="og:title"[^>]*content="([^"]*)"', html
-    )
-    assert titles[-1] == "Picker in a Popover", (
-        "the prerender's og:title override changed — re-measure the fleet"
+    assert titles[-1].startswith(PAGE_TITLE_PREFIX), (
+        f"the scraper-winning og:title lost {PAGE_TITLE_PREFIX!r}; got {titles!r}"
     )
 
 

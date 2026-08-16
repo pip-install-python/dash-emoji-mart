@@ -6,10 +6,12 @@ directive inside a page imports the sibling ``example.py`` to embed the live
 demo, so a new page is a directory with two files in it and no Python edits
 anywhere else.
 
-This is the dash-documentation-boilerplate loader with the visibility gate
-removed: dash-emoji-mart's documentation is entirely public, so there is no
-Clerk dependency, no per-page tier and no admin control board. Pages register
-their layout directly and llms.txt prose goes straight to dash-improve-my-llms.
+This is the dash-documentation-boilerplate loader. dash-emoji-mart's
+documentation is entirely public today, so every page's `tier` frontmatter is
+absent and resolves to public — but the tier is recorded per page
+(lib/page_tiers.py) all the same, so the network's 402 experiment can tighten
+a document via frontmatter or the hub's ceilings without touching this loader.
+llms.txt prose goes straight to dash-improve-my-llms.
 """
 
 import logging
@@ -24,7 +26,7 @@ from dash_improve_my_llms import register_page_metadata
 from markdown2dash import Admonition, BlockExec, Divider, Image, create_parser
 from pydantic import BaseModel
 
-from lib import markdown_inline
+from lib import markdown_inline, page_tiers
 from lib.ad_client import inject_ad_into_aside
 from lib.constants import (
     NAME_CONTENT_MAP,
@@ -37,6 +39,7 @@ from lib.directives.llms_copy import LlmsCopy
 from lib.directives.props import Props
 from lib.directives.source import SC
 from lib.directives.toc import TOC
+from lib.versions import substitute_versions
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
@@ -53,6 +56,10 @@ class Meta(BaseModel):
     package: str = "dash-emoji-mart"
     category: Optional[str] = None
     icon: Optional[str] = None
+    # Who may read this page: public | auth | admin | hidden. Absent means
+    # public — see lib/page_tiers.py for the tier model and why the default
+    # is open. Enforced only when access control is wired in run.py.
+    tier: Optional[str] = None
 
 
 # The directive line AND the indented `:option: value` lines that belong to it.
@@ -157,6 +164,13 @@ for file in files:
     metadata, content = frontmatter.parse(file.read_text())
     metadata = Meta(**metadata)
 
+    # Substitute derived facts BEFORE any consumer sees the text, so the
+    # browser page, the copy button, and /<page>/llms.txt all publish the
+    # same truth. A doc writes {{VERSION:<distribution>}} instead of a
+    # version number — any installed package, so this site documents
+    # dash-emoji-mart the same way. See lib/versions.py for why.
+    content = substitute_versions(content, source=str(file))
+
     # The "copy for LLMs" button reads the raw markdown back out of here.
     NAME_CONTENT_MAP[metadata.name] = content
 
@@ -205,6 +219,10 @@ for file in files:
         category=metadata.category,
         icon=metadata.icon,
     )
+
+    # Record the declared tier before the prose is registered, so a gate can
+    # never be applied later than the content it is meant to gate.
+    page_tiers.register(metadata.endpoint, metadata.tier)
 
     # Feed the directive-expanded markdown to dash-improve-my-llms so
     # /<page>/llms.txt serves real prose with the example source inlined.
