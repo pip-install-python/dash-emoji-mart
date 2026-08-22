@@ -206,13 +206,6 @@ div .m_46b77525 {
     margin-top: calc(0.5rem* var(--mantine-scale)) !important;
 }
 
-.m_5caae85b {
-    position: absolute !important;
-    top: calc(0.3125rem* var(--mantine-scale));
-    inset-inline-end: calc(0.3125rem* var(--mantine-scale));
-    z-index: 1;
-}
-
 .m_9cdde9a {
     inset-inline-end: 0;
     width: var(--app-shell-aside-width);
@@ -329,25 +322,6 @@ img[alt=logo] { width: 100%; }
 #light-theme-icon iconify-icon {
     transition: transform 0.3s ease-out;
     display: inline-block;
-}
-
-/* Typewriter cursor animation for Dash Docs title */
-@keyframes blink-cursor {
-    0%, 49% {
-        opacity: 1;
-    }
-    50%, 100% {
-        opacity: 0;
-    }
-}
-
-/* Blinking cursor while the typewriter is running.
-   Color tracks the dash-leaflet2 green brand (matches the title text). */
-#dash-docs-title.typing::after {
-    content: '▋';
-    animation: blink-cursor 1s step-end infinite;
-    margin-left: 2px;
-    color: var(--mantine-color-green-6);
 }
 
 /* AG Grid Dark Mode Support */
