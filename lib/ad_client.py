@@ -140,6 +140,15 @@ def create_ad_component(page_path: str) -> html.Div:
                                 "height": "auto",
                                 "display": "block",
                                 "borderRadius": "8px",
+                                # Reserve the box BEFORE the creative loads.
+                                # Without a hint the image starts 0px tall and
+                                # shifts the whole aside downward when it
+                                # arrives — the Lighthouse CLS finding of
+                                # 2026-08-21. The network's ad cards are
+                                # square; a non-square creative still renders
+                                # fully (height:auto wins once loaded) and
+                                # costs only its own delta.
+                                "aspectRatio": "1 / 1",
                             },
                         ),
                         dmc.Text(
