@@ -17,8 +17,10 @@
 #   docker run --rm -p 8050:8050 -e PORT=8050 dash-emoji-mart-docs
 #   open http://localhost:8050
 #
-# NOTE: unlike the dash-leaflet2 sibling this app has NO Clerk auth and no admin
-# control board — every page is public, so there are no CLERK_* variables here.
+# NOTE: this app ships DARK — every page is public (PAGE_DEFAULT_TIER below) —
+# but it now carries the full interactive-gate stack and the Clerk block, so
+# the phase-4 flip is one environment change on the service and not a redeploy.
+# The gate wave's rule: ship dark, verify from the deploy log, flip later.
 services:
   - type: web
     name: dash-emoji-mart-docs
@@ -127,6 +129,90 @@ services:
       - key: TRAFFIC_ANALYTICS_FILE
         value: /var/data/visitor_analytics.json
 
+      # --- The interactive gate (lib/access.py, lib/gate_layouts.py) ------
+      # THE FLIP LEVER, and the reason the wave ships dark. `public` is the
+      # tier every page without frontmatter of its own resolves to, so this
+      # single value is what stands between the current site and a sign-in
+      # card on every doc. Set explicitly rather than left unset: its presence
+      # is also what forces the access wiring on (run.py's configure(force=)),
+      # so the verdict plumbing and the prerender's use of it are exercised
+      # NOW, during the dark launch, instead of first at the moment of a flip.
+      #
+      # Rollback is this value, and nothing else — no code revert anywhere.
+      - key: PAGE_DEFAULT_TIER
+        value: public
+
+      # The SECOND axis, and the phase-4 agent flip. While "1", the machine
+      # surfaces (the llms.txt family, crawler HTML, the prerender) stay open
+      # even on pages the interactive gate closes — which is what keeps the
+      # 30-day crawl-demand measurement running while humans meet a sign-in
+      # card. Setting it to "0" closes the machine lane everywhere at once.
+      #
+      # Declared here at its default so the knob is VISIBLE. The wave leaves
+      # it at 1 on every host until phase 4.
+      - key: LLMS_PUBLIC_DEFAULT
+        value: "1"
+
+      # --- Clerk satellite auth (lib/auth.py) -----------------------------
+      # Every one of these is inert until CLERK_SECRET_KEY and
+      # CLERK_PUBLISHABLE_KEY are actually set in the dashboard: lib/auth.py
+      # registers nothing without them and the site runs exactly as public as
+      # it does today. They are declared here so the flip is a dashboard
+      # action rather than a blueprint edit.
+      #
+      # BLUEPRINT vs DASHBOARD, the leaflet lesson: a variable declared in
+      # this file is not a variable present on the running service. The
+      # dashboard add is what reaches it. Diff declared-vs-live before any
+      # flip — leaflet measured SEVEN declared variables absent live.
+      - key: CLERK_SECRET_KEY
+        sync: false
+      - key: CLERK_PUBLISHABLE_KEY
+        sync: false
+      # The 2plot.ai PRIMARY on its production Clerk instance (Account Portal
+      # + Frontend API custom domains — not *.accounts.dev).
+      - key: CLERK_SIGN_IN_URL
+        value: https://accounts.2plot.ai/sign-in
+      - key: CLERK_SIGN_UP_URL
+        value: https://accounts.2plot.ai/sign-up
+      # THE RETURN TRIP — the stage-5 blocker the leaflet pilot surfaced.
+      # Unset, buildSatelliteRedirect() returns null and an authenticated
+      # reader is stranded on the primary, silently. A truthy NON-URL is
+      # worse: a Sign In button that 404s. lib/auth.py boot-guards both, and
+      # the ABSENCE of its two [auth] warnings from the deploy log is one of
+      # the gate wave's acceptance checks.
+      - key: CLERK_SATELLITE_SIGN_IN_REDIRECT
+        value: https://2plot.ai/onboarding
+      # REQUIRED in satellite mode: a production custom-domain instance cannot
+      # derive this from CLERK_SIGN_IN_URL.
+      - key: CLERK_FRONTEND_API
+        value: https://clerk.2plot.ai
+      # The REGISTERED SATELLITE DOMAIN — deliberately NOT the host this app
+      # is served on. Every *.2plot.dev docs host is an ALLOWED SUBDOMAIN of
+      # the one registered satellite, so this says 2plot.dev and not
+      # emojimart.2plot.dev.
+      - key: CLERK_SATELLITE_DOMAIN
+        value: 2plot.dev
+      - key: CLERK_IS_SATELLITE
+        value: "true"
+      # Signs the session and __dca_identity cookies. Without it
+      # dash-clerk-auth falls back to a PUBLIC dev default string — so this
+      # must be generated per service and must never be shared between hosts.
+      - key: SESSION_SECRET
+        generateValue: true
+      # Admin allowlist for admin-tier pages (lib.auth.is_admin_user), which
+      # on this host means /admin/control-board.
+      - key: ADMIN_EMAILS
+        sync: false
+
+      # The control board's override store — the OTHER half of the disk below.
+      # A board toggle that resets on every deploy is worse than no board: it
+      # silently republishes a page somebody deliberately hid. lib/auth.py and
+      # lib/page_visibility.py boot-guard both /var/data paths, and it is the
+      # absence of that [visibility] warning — not the Render dashboard — that
+      # the wave accepts this host on.
+      - key: PAGE_VISIBILITY_FILE
+        value: /var/data/page_visibility.json
+
       # --- Iconify (dash_emoji_mart.iconify) ---------------------------
       # The /iconify page builds its categories at import time and caches the
       # API responses for 24h. Now that the analytics disk exists the cache
@@ -136,10 +222,21 @@ services:
       - key: DASH_EMOJI_MART_CACHE_DIR
         value: /var/data/iconify-cache
 
-    # 1 GB at /var/data — the analytics ledger's home. Copied from the
-    # boilerplate's render.yaml: without it TRAFFIC_ANALYTICS_FILE above sits
-    # on the container filesystem and every deploy erases the day's ledger
-    # (see that variable's comment for why the hub then keeps the wrong total).
+    # 1 GB at /var/data, and it now carries TWO ledgers: the visitor analytics
+    # (TRAFFIC_ANALYTICS_FILE) and the control board's overrides
+    # (PAGE_VISIBILITY_FILE). Without it both sit on the container filesystem
+    # and every deploy erases them — the day's traffic total AND whichever
+    # pages somebody hid.
+    #
+    # A DECLARATION ATTACHES NOTHING (leaflet, 2026-08-21): that repo ran for
+    # weeks with this exact block and no disk, the app quietly mkdir'd
+    # /var/data on the container filesystem, and every deploy wiped both.
+    # Verify in the dashboard's Disks tab, or trust the boot guards — a
+    # [visibility] warning names exactly which half is missing, and its
+    # absence is the pass. Accepted trade-off, fleet-wide: a disk-backed
+    # service restarts with a brief blip instead of overlapping instances,
+    # which is correct for a docs site (and is why cd.yml now verifies WHICH
+    # build is answering /healthz).
     disk:
       name: analytics
       mountPath: /var/data

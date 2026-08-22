@@ -218,6 +218,31 @@ OG_IMAGE_HEIGHT = 630
 OG_IMAGE_TYPE = "image/png"
 OG_IMAGE_ALT = SITE_BRAND
 
+# JSON-LD identity for the crawler document (dash-improve-my-llms 2.5.0+).
+#
+# `PUBLISHER` becomes the schema.org `publisher` on every crawler page, and
+# from 2.6.0 it also carries `publisher.logo` — pointed at the icon set below,
+# which is why the favicon pixels and this string have to be right together.
+#
+# `SAME_AS` becomes JSON-LD `sameAs`: the documented package's GitHub repo and
+# its PyPI project. Three URLs pointing at each other is the strongest
+# available statement of which origin is this package's canonical docs home —
+# and it is the half of the loop that lives in code. The other half (PyPI
+# project_urls and the GitHub README pointing back at emojimart.2plot.dev) is
+# a release checklist item, not something this file can enforce.
+PUBLISHER = "Pip Install Python LLC"
+SAME_AS = [
+    "https://github.com/pip-install-python/dash-emoji-mart",
+    "https://pypi.org/project/dash-emoji-mart/",
+]
+
+# Height of the fixed AppShell header, in px. Consumed by AppShell(header=...)
+# and by the mobile drawer, which docks itself directly below the header — the
+# drawer's offset is computed from this, so a header that grew without this
+# constant growing leaves a strip of page visible above the drawer.
+# Change it here only; the two must never drift apart.
+HEADER_HEIGHT = 70
+
 # 2plot network links, surfaced in the README and the docs header/navbar.
 GITHUB_URL = "https://github.com/pip-install-python/dash-emoji-mart"
 DISCORD_URL = "https://discord.gg/WEnZR35mrK"

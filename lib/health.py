@@ -13,11 +13,29 @@ reported back as this app being slow.
 """
 from __future__ import annotations
 
+import os
+
 import dash
 
 
 def health_payload(backend: str) -> dict:
-    return {"ok": True, "backend": backend, "dash_version": dash.__version__}
+    payload = {"ok": True, "backend": backend, "dash_version": dash.__version__}
+    # Which commit the RUNNING instance was built from — the field that lets CD
+    # verify the artifact IT shipped rather than whichever build happens to be
+    # serving. A Render service with a disk restarts with a brief blip instead
+    # of overlapping instances, so a bare 200 proves nothing about WHICH build
+    # answered: the muicharts finding of 2026-08-21, where the battery had been
+    # measuring the PREVIOUS release on every run, invisibly, because the old
+    # build always passed the old battery. It only shows when a run adds a new
+    # surface.
+    #
+    # Optional on purpose: omitted wherever the platform variable does not
+    # exist, so the fleet's /healthz probe contract is unchanged and the hourly
+    # sweep reads exactly what it always did.
+    build = os.environ.get("RENDER_GIT_COMMIT")
+    if build:
+        payload["build"] = build
+    return payload
 
 
 def register_health_route(app, backend: str) -> None:

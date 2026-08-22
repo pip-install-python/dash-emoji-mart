@@ -161,7 +161,7 @@ def test_llms_package_floor_is_the_network_standard():
 def test_the_requirements_floor_matches():
     """The installed version proves nothing about what CI or Render installs."""
     reqs = (REPO_ROOT / "requirements.txt").read_text()
-    assert "dash-improve-my-llms[flask]>=2.5.1" in reqs
+    assert "dash-improve-my-llms[flask]>=2.6.0" in reqs
 
 
 # ---------------------------------------------------------------------------

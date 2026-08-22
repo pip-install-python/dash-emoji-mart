@@ -229,18 +229,26 @@ def test_no_local_key_material():
     Pinned because the tempting fix for a hub outage is a local fallback, and
     that would put signing material on eight hosts instead of one.
 
-    lib/hub_client.py is the ONE sanctioned mention: it is the network's
-    verify-on-the-hub client (ported in the 1.3.x sync), and it names the
-    hub's /api/agent-key/* endpoints precisely because it holds no key
-    material of its own — it cannot mint, and it cannot verify offline. Any
-    OTHER lib file mentioning agent keys is still the failure this test
+    TWO files are sanctioned, and for the same reason — each names agent keys
+    precisely because it holds none:
+
+      * lib/hub_client.py — the network's verify-on-the-hub client (ported in
+        the 1.3.x sync). It names the hub's /api/agent-key/* endpoints; it
+        cannot mint, and it cannot verify offline.
+      * lib/agent_key.py — the GET /api/agent-key route (ported in the gate
+        wave). It reads the browser's Clerk __session cookie and hands it to
+        hub_client.current_key(); the HUB verifies that token against Clerk's
+        JWKS and pins scope=auth. The satellite asserts no identity of its own
+        and cannot mint an admin key. 204 whenever the hub declines.
+
+    Any OTHER lib file mentioning agent keys is still the failure this test
     exists to catch.
     """
     from conftest import REPO_ROOT
 
     offenders = []
     for path in sorted((REPO_ROOT / "lib").glob("*.py")):
-        if path.name == "hub_client.py":
+        if path.name in ("hub_client.py", "agent_key.py"):
             continue
         text = path.read_text()
         if "agent-key" in text or "AGENT_KEY" in text:

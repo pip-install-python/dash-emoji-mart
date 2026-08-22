@@ -5,6 +5,7 @@ endpoint: "/theming"
 package: dash-emoji-mart
 category: "Configuration"
 icon: "tabler:sun-moon"
+lastmod: 2026-08-01
 ---
 
 .. llms_copy::Theming

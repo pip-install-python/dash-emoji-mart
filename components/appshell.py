@@ -3,7 +3,7 @@ from dash import Output, Input, clientside_callback, dcc, page_container, State
 
 from components.header import create_header
 from components.navbar import create_navbar, create_navbar_drawer
-from lib.constants import PRIMARY_COLOR
+from lib.constants import HEADER_HEIGHT, PRIMARY_COLOR
 from lib.pageview_beacon import beacon_component
 
 
@@ -189,11 +189,11 @@ def create_appshell(data):
                     create_navbar_drawer(data),
                     dmc.AppShellMain(
                         children=page_container,
-                        style={"minHeight": "calc(100vh - 70px)"}  # Full height minus header
+                        style={"minHeight": f"calc(100vh - {HEADER_HEIGHT}px)"}
                     ),
                 ],
                 id="m2d-appshell",
-                header={"height": 70},
+                header={"height": HEADER_HEIGHT},
                 padding="xl",
                 navbar={
                     "width": 280,

@@ -31,7 +31,17 @@ dash[fastapi]==4.4.1  # COMPAT-MATRIX: dash
 # --- Docs shell ------------------------------------------------------------
 # NOTE: python-frontmatter 1.3+ imports typing.TypeGuard, so running the docs
 # site needs Python >= 3.10. The dash_emoji_mart PACKAGE needs only >= 3.9.
-dash_mantine_components==2.7.0
+# 2.8.0 is a FLOOR, not a preference: the network-standard mobile drawer
+# (components/navbar.py's create_navbar_drawer) renders as a floating card on
+# 2.7.0 from byte-identical props — the gate wave's read-first correction, and
+# a defect no test in this repo can see because it is pure layout.
+#
+# 2.8's ActionIcon/Anchor accept `aria-*` wildcards but REJECT `title=`, and
+# the rejection is a TypeError raised DURING APP CONSTRUCTION — the whole site
+# fails to boot rather than rendering a wrong tooltip. Use `aria-label` for the
+# accessible name and `dmc.Tooltip` for hover text; never `title=` on a DMC
+# component.
+dash_mantine_components>=2.8.0
 dash-iconify==0.1.2
 
 # markdown2dash 0.1.2 declares `gunicorn>=21.2.0,<22.0.0` — a markdown parser
@@ -71,10 +81,42 @@ python-frontmatter
 # (/llms-small.txt, /llms-full.txt) that LLMS_SMALL_TIER / LLMS_FULL_TIER
 # govern. Below it the tier wiring in run.py is dead code and nothing says so;
 # run.py enforces this same floor at boot for exactly that reason.
-dash-improve-my-llms[flask]>=2.5.1
+#
+# 2.6.0 is the gate-wave floor. It ends the invented sitemap date: `lastmod=`
+# on register_page_metadata is emitted VERBATIM and omitted when absent, where
+# 2.5.x swallowed it into **kwargs and kept stamping build dates on every URL.
+# It also adds icon autodiscovery (this site still declares configure_seo(
+# icons=[...]) explicitly — declared wins, and tests/test_seo_icons.py pins
+# that the two sets agree) and the JSON-LD publisher logo.
+dash-improve-my-llms[flask]>=2.6.0
 python-dotenv>=1.0
 pydantic>=2.0
 requests>=2.31
+
+# --- Clerk authentication (vendored — not on PyPI) --------------------------
+# Installed ALWAYS, gated at runtime: with no CLERK_* keys in the environment
+# lib/auth.py registers nothing and this site runs fully public, which is how
+# it ships today (PAGE_DEFAULT_TIER=public). The dependency buys the
+# CAPABILITY — the sign-in card, the Clerk avatar, the interactive gate — so
+# the phase-4 flip is one environment variable and not a redeploy.
+#
+# The two floors below are the fleet security baseline, not a preference:
+# clerk-backend-api 5.x capped cryptography at <47.0.0, below the fixes for
+# GHSA-537c-gmf6-5ccf (48.0.1), PYSEC-2026-3553/3554 (49.0.0) and
+# PYSEC-2026-3552 (50.0.0) — four advisories this repo re-reported to
+# pip-audit on every run. SDK 7.0.0 allows cryptography <51.0.0 and
+# dash-clerk-auth widened its own cap to <8 precisely so applications can
+# assert these floors rather than merely tolerate them.
+#
+# PROVENANCE — the dist/ tarball IS the release; there is no PyPI package:
+#   sha256  a2f9062e15a69fc79deeaf76fcf1380907a961978db558b2aa227572cb2b74f3
+# Vendored from Dash-Clerk-Auth-Hook/dist/ and verified 2026-08-21. The sha is
+# the only thing that admits a tarball into this file: early builds of BOTH
+# 1.0.4 and 1.0.5 went stale on sdist-shipped doc edits and are not
+# distinguishable by name, size or date. Re-verify before every copy.
+./vendor/dash_clerk_auth-1.0.5.tar.gz
+clerk-backend-api>=7.0.0,<8
+cryptography>=50.0.0
 
 # --- Deployment ------------------------------------------------------------
 # gunicorn serves the Flask (WSGI) backend in the Dockerfile. The FastAPI
