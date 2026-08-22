@@ -28,7 +28,16 @@ WORKDIR /app
 # package directory present at install time — hence the four COPYs rather than
 # requirements.txt alone. dash_emoji_mart/ carries the committed JS bundle, so
 # this is still a Node-free build.
+#
+# vendor/ is the fifth, and it is not optional: requirements.txt installs
+# dash-clerk-auth from `./vendor/dash_clerk_auth-1.0.5.tar.gz` because that
+# package has no PyPI release — the dist/ tarball IS the release. pip resolves
+# that path against the BUILD CONTEXT's working directory, so without this line
+# it reports the file as merely "looks like a filename" in a warning and then
+# dies on the OSError several seconds later, which reads like a network problem
+# and is not one.
 COPY requirements.txt pyproject.toml MANIFEST.in README.md ./
+COPY vendor/ ./vendor/
 COPY dash_emoji_mart/ ./dash_emoji_mart/
 RUN pip install --no-cache-dir -r requirements.txt
 

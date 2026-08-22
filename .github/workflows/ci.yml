@@ -107,13 +107,35 @@ jobs:
 
           gunicorn_v = version("gunicorn")
           dimll_v = version("dash-improve-my-llms")
-          print(f"gunicorn {gunicorn_v} · dash-improve-my-llms {dimll_v}")
+          clerk_v = version("clerk-backend-api")
+          crypto_v = version("cryptography")
+          dmc_v = version("dash-mantine-components")
+          print(f"gunicorn {gunicorn_v} · dash-improve-my-llms {dimll_v} · "
+                f"clerk-backend-api {clerk_v} · cryptography {crypto_v} · "
+                f"dash-mantine-components {dmc_v}")
           assert parts(gunicorn_v)[:2] >= (23, 0), (
               f"gunicorn {gunicorn_v} is under the CVE floor — markdown2dash's "
               "spurious <22 pin won"
           )
-          assert parts(dimll_v) >= (2, 3, 4), (
-              f"dash-improve-my-llms {dimll_v} predates resolve_site_title"
+          assert parts(dimll_v) >= (2, 6, 0), (
+              f"dash-improve-my-llms {dimll_v} is below the 2.6.0 gate-wave "
+              "floor — `lastmod=` would be swallowed and the sitemap would go "
+              "back to inventing build dates"
+          )
+          # The 1.0.1 advisory work: clerk-backend-api 5.x capped cryptography
+          # at <47, below the fixes for GHSA-537c-gmf6-5ccf, PYSEC-2026-3553/
+          # 3554 and PYSEC-2026-3552. A resolver that walks either back under
+          # its floor silently re-opens all four.
+          assert parts(clerk_v)[0] == 7, (
+              f"clerk-backend-api {clerk_v} is outside >=7,<8"
+          )
+          assert parts(crypto_v)[0] >= 50, (
+              f"cryptography {crypto_v} is below the 50.0.0 advisory floor"
+          )
+          # 2.7.0 renders the network-standard drawer as a floating card from
+          # identical props — a layout defect no test in this repo can see.
+          assert parts(dmc_v) >= (2, 8, 0), (
+              f"dash-mantine-components {dmc_v} is below the 2.8.0 floor"
           )
           PY
 
@@ -373,6 +395,8 @@ jobs:
 
           gunicorn_v = version("gunicorn")
           dimll_v = version("dash-improve-my-llms")
+          clerk_v = version("clerk-backend-api")
+          crypto_v = version("cryptography")
 
           # markdown2dash must be importable despite being installed --no-deps:
           # if any of its real runtime dependencies is missing from
@@ -380,12 +404,28 @@ jobs:
           # failure would otherwise appear as a boot crash on Render.
           import markdown2dash  # noqa: F401
 
-          print(f"gunicorn {gunicorn_v} · dash-improve-my-llms {dimll_v}")
+          # The vendored Clerk package has no PyPI release — it is installed
+          # from ./vendor/ inside the image. Importing it here is what proves
+          # the tarball actually reached the build context: a missing COPY
+          # fails the docker build loudly, but a vendor/ that resolved to an
+          # EMPTY directory would install nothing and fail much later, at the
+          # first request that touches auth.
+          import dash_clerk_auth  # noqa: F401
+
+          print(f"gunicorn {gunicorn_v} · dash-improve-my-llms {dimll_v} · "
+                f"clerk-backend-api {clerk_v} · cryptography {crypto_v} · "
+                f"dash-clerk-auth {version('dash-clerk-auth')}")
           assert parts(gunicorn_v)[:2] >= (23, 0), (
               f"image has gunicorn {gunicorn_v}; markdown2dash's <22 pin won"
           )
-          assert parts(dimll_v) >= (2, 3, 4), (
-              f"image has dash-improve-my-llms {dimll_v}, below the network floor"
+          assert parts(dimll_v) >= (2, 6, 0), (
+              f"image has dash-improve-my-llms {dimll_v}, below the 2.6.0 floor"
+          )
+          assert parts(clerk_v)[0] == 7, (
+              f"image has clerk-backend-api {clerk_v}, outside >=7,<8"
+          )
+          assert parts(crypto_v)[0] >= 50, (
+              f"image has cryptography {crypto_v}, below the advisory floor"
           )
           PY
 
