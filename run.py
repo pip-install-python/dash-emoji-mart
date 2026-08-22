@@ -39,6 +39,26 @@ from dotenv import load_dotenv
 # Load env before Dash imports run — the satellite/ad keys are read at import.
 load_dotenv()
 
+# THE FORK POINT — claim this app's network identity before any hub-facing
+# module imports.
+#
+# Every module that names this app (satellite_reporter, ad_client, hub_client,
+# bulletin) carries its own fallback default, and after a template sync those
+# defaults DISAGREE: lib/satellite_reporter.py is byte-copied from the
+# boilerplate and its fallback therefore says "boilerplate", while this fork's
+# other modules say "emojimart". An unset SATELLITE_APP_KEY then files THIS
+# site's traffic under the TEMPLATE's row on the hub — found live on pannellum,
+# 2026-08-21, and the same class as the flows-reported-as-boilerplate
+# contamination already in the hub's history.
+#
+# Keeping the reporter byte-identical is the acceptance check for the whole
+# sync (`shasum` against the boilerplate's copy), so the identity claim has to
+# live out here instead. setdefault: a real value from the Render dashboard or
+# .env always wins — this line only closes the unset gap.
+#
+# FORKS CHANGE THIS ONE STRING.
+os.environ.setdefault("SATELLITE_APP_KEY", "emojimart")
+
 import dash
 from dash import Dash, _dash_renderer
 
@@ -56,6 +76,12 @@ from lib.backend import get_backend_info, resolve_backend
 from lib.constants import (
     APP_VERSION,
     BASE_URL,
+    OG_IMAGE_ALT,
+    OG_IMAGE_HEIGHT,
+    OG_IMAGE_URL,
+    OG_IMAGE_WIDTH,
+    PUBLISHER,
+    SAME_AS,
     SITE_BRAND,
     SITE_DESCRIPTION,
     SITE_TITLE,
@@ -83,13 +109,22 @@ from lib.constants import (
 # the venv was rebuilt keeps its already-imported 2.0.0 in memory and happily
 # serves the stub. Version drift this consequential should announce itself.
 #
-# 2.5.1 is the network's 402-instrumentation floor (1.3.x sync): it adds
+# 2.5.1 was the network's 402-instrumentation floor (1.3.x sync): it adds
 # `configure_access` / `configure_viewer_identity` — what lib/access.py hands
 # the tier policy to — and the tiered corpus documents (/llms-small.txt,
 # /llms-full.txt) that the LLMS_SMALL_TIER / LLMS_FULL_TIER knobs govern.
 # Below it the tier registrations further down are dead code and nothing says so.
+#
+#   * 2.6.0 is the gate-wave floor, and it belongs in this list for the same
+#     reason as the rest: below it `lastmod=` on register_page_metadata is
+#     swallowed into **kwargs and SILENTLY IGNORED, so every real date this
+#     repo stamps in frontmatter is discarded and <lastmod> reverts to invented
+#     build dates on every URL — a sitemap that lies daily, and the exact thing
+#     2.6.0 exists to end. It also brings icon autodiscovery (this site still
+#     declares configure_seo(icons=) explicitly; tests/test_seo_icons.py pins
+#     that the two sets agree) and the JSON-LD publisher logo.
 # ----------------------------------------------------------------------------
-_DIMLL_FLOOR = (2, 5, 1)
+_DIMLL_FLOOR = (2, 6, 0)
 
 
 def _check_dimll_version() -> str:
@@ -121,6 +156,11 @@ def _check_dimll_version() -> str:
 
 DIMLL_VERSION = _check_dimll_version()
 
+# Imported AFTER the floor fires, deliberately: on a pre-2.5.0 package this
+# name does not exist, and the floor's diagnosis above is a far better error
+# than a bare ImportError from the import block at the top of the file.
+from dash_improve_my_llms import configure_seo  # noqa: E402
+
 # ----------------------------------------------------------------------------
 # Pluggable backend (Dash 4.1+). FastAPI by default; DASH_BACKEND=flask is what
 # the Docker image uses, because gunicorn serves WSGI and FastAPI is ASGI.
@@ -140,6 +180,22 @@ print(
 # is the question a stale process makes you ask, and the answer is never
 # visible from the browser.
 print(f"[dash-emoji-mart] interpreter: {sys.executable}")
+
+# ----------------------------------------------------------------------------
+# Clerk satellite auth. MUST run BEFORE Dash(...) — register_clerk_auth
+# installs @dash.hooks callbacks that fire during app construction, so calling
+# it afterwards silently does nothing at all.
+#
+# Fully optional and OFF here today: with no CLERK_* keys in the environment
+# this registers nothing and the site runs exactly as public as it always has.
+# The wiring exists so the phase-4 flip is an env change on the service and not
+# a redeploy of this file. See lib/auth.py, which also boot-guards the two
+# CLERK_SATELLITE_SIGN_IN_REDIRECT mistakes (unset strands authenticated users
+# on the primary; a truthy non-URL renders a 404ing Sign In button).
+# ----------------------------------------------------------------------------
+from lib import auth as _auth  # noqa: E402
+
+CLERK_ENABLED = _auth.register()
 
 # ----------------------------------------------------------------------------
 # Dash app
@@ -169,6 +225,10 @@ except TypeError:
 
 app._backend_info = BACKEND_INFO
 
+# dash-clerk-auth splits its setup either side of Dash(...): sessions, the
+# /api/auth/* routes and per-request identity are wired here. No-op when off.
+_auth.configure_app(app)
+
 # ----------------------------------------------------------------------------
 # AI/LLM & SEO configuration
 # ----------------------------------------------------------------------------
@@ -190,6 +250,52 @@ app._base_url = BASE_URL
 # The docs stay fully reachable by anything a person actually asked to fetch
 # them; only unattended corpus scraping is refused. Flip the flag and this
 # comment together if that ever changes.
+# ----------------------------------------------------------------------------
+# Site identity for the CRAWLER document (dash-improve-my-llms >= 2.5.0).
+#
+# Until 2.5.0 the generated crawler HTML carried this page's content signals
+# and none of its identity: a browser got the icon links, og:image and the
+# twitter card from templates/index.html while Googlebot got none of them, on
+# every host in this network — which is why search showed a generic globe next
+# to a site that has had its own mark for months. Content may differ between
+# the crawler document and the browser document; identity may not.
+#
+# It also claims the root icon paths (`root_icons`, on by default): /favicon.ico
+# is where Google looks when a document declares no icon, and Dash's page
+# catch-all was answering it with the app shell — 200 text/html where an image
+# belongs, which is an actively poisoned fallback rather than a missing one.
+# 2.6.0 redirects it to the .ico declared below, so this repo needs no second
+# copy of that file at the assets root (see scripts/make_brand_assets.py, which
+# explains why the duplicate that once lived there was removed).
+configure_seo(
+    icons=[
+        # The SAME four files templates/index.html links, so the browser head
+        # and the crawler head cannot drift apart — and deliberately the same
+        # set 2.6.0's autodiscovery finds in assets/favicon/, which
+        # tests/test_seo_icons.py pins as set-equality. That agreement is the
+        # proof the fleet can eventually rely on discovery alone.
+        #
+        # These are this site's own names, not the boilerplate's
+        # (`android-chrome-192x192.png` and friends): the pixels here are
+        # already this app's, generated by scripts/make_brand_assets.py from
+        # Noto's U+1F920, and renaming correct art to match a template would
+        # buy nothing while breaking the generator, its --check guard and
+        # tests/test_social_card.py. Discovery reads the sizes off these names
+        # correctly (`favicon-192.png` -> 192x192).
+        "/assets/favicon/favicon.ico",
+        {"href": "/assets/favicon/favicon-192.png", "sizes": "192x192"},
+        {"href": "/assets/favicon/favicon-512.png", "sizes": "512x512"},
+        {"href": "/assets/favicon/apple-touch-icon.png",
+         "rel": "apple-touch-icon", "sizes": "180x180"},
+    ],
+    social_image=OG_IMAGE_URL,
+    social_image_alt=OG_IMAGE_ALT,
+    social_image_width=OG_IMAGE_WIDTH,
+    social_image_height=OG_IMAGE_HEIGHT,
+    publisher=PUBLISHER,
+    same_as=SAME_AS,
+)
+
 app._robots_config = RobotsConfig(
     block_ai_training=True,
     allow_ai_search=True,
@@ -321,6 +427,7 @@ print(
 # ----------------------------------------------------------------------------
 from lib import access as _access  # noqa: E402
 from lib import page_tiers as _page_tiers  # noqa: E402
+from lib import page_visibility as _page_visibility  # noqa: E402
 
 # Tiered corpus documents (dash-improve-my-llms >= 2.4.0). Pseudo-paths:
 # they never enter dash.page_registry, so they cannot leak into listings —
@@ -329,10 +436,29 @@ from lib import page_tiers as _page_tiers  # noqa: E402
 # default tier, i.e. public), and the hub can tighten either network-wide
 # through its page-tier ceilings with no redeploy here. Inert on older
 # package versions.
-_page_tiers.register("/llms-small.txt", os.environ.get("LLMS_SMALL_TIER"))
-_page_tiers.register("/llms-full.txt", os.environ.get("LLMS_FULL_TIER"))
+# The explicit `or "public"` matters: these registered under the
+# PAGE_DEFAULT_TIER fallback before, which meant flipping that env to gate the
+# INTERACTIVE site would silently gate the corpus documents too. Their tier is
+# now always a deliberate setting and never an ambient default.
+_page_tiers.register("/llms-small.txt",
+                     os.environ.get("LLMS_SMALL_TIER") or "public")
+_page_tiers.register("/llms-full.txt",
+                     os.environ.get("LLMS_FULL_TIER") or "public")
 
-ACCESS_ENABLED = _access.configure()
+# The home page's own tier, stated rather than inherited. docs/home/home.md
+# declares no `tier` in its frontmatter, so under PAGE_DEFAULT_TIER=auth the
+# front door would silently join the gate. The funnel's entrance stays public,
+# always — a sign-in card on `/` is not a dark launch, it is an outage.
+_page_tiers.register("/", "public")
+
+# force= when either gate env is present. With every tier still public the
+# auto-detect would skip the wiring entirely, but a host that flips by env
+# needs the verdict plumbing — and the prerender's use of it — live during the
+# DARK launch, not first exercised at the moment of the flip.
+ACCESS_ENABLED = _access.configure(
+    force=bool(os.environ.get("PAGE_DEFAULT_TIER")
+               or os.environ.get("LLMS_PUBLIC_DEFAULT"))
+)
 
 # /llms.txt, /<page>/llms.txt, /robots.txt, /sitemap.xml, the universal
 # prerender and the bot middleware. dash-improve-my-llms auto-detects the
@@ -358,15 +484,47 @@ app.layout = create_appshell(dash.page_registry.values())
 server = app.server
 
 # ----------------------------------------------------------------------------
+# The person→agent handoff: /api/agent-key turns the browser's Clerk session
+# into a portable `?key=` for copied llms.txt URLs (lib/agent_key.py, and the
+# fetch in assets/llms_copy.js). 204 for everyone until Clerk and the hub are
+# configured, so it is safe to mount unconditionally.
+# ----------------------------------------------------------------------------
+from lib.agent_key import register_agent_key_route  # noqa: E402
+
+register_agent_key_route(app, BACKEND)
+
+# The gate's boot line. Its PRESENCE is one of the four things the gate wave
+# accepts a host on, read from the deploy log alone — the other three being the
+# ABSENCE of the [visibility] and [auth] warnings. Printed even when everything
+# is public, because "the wiring is present and says public" and "there is no
+# wiring" are the two states this line exists to tell apart.
+_non_public = sum(1 for t in _page_tiers.registered().values() if t != "public")
+print(
+    f"[emojimart] interactive gate: default tier "
+    f"'{os.environ.get('PAGE_DEFAULT_TIER') or 'public'}', "
+    f"{_non_public} non-public page(s), machine surfaces "
+    f"{'GATED' if not _page_tiers.get_llms_public('/__probe__') else 'open'} "
+    f"by default (LLMS_PUBLIC_DEFAULT), access wiring "
+    f"{'ON' if ACCESS_ENABLED else 'off'}, control board at "
+    f"/admin/control-board ({_page_visibility.override_count()} live "
+    f"override(s))."
+)
+
+# ----------------------------------------------------------------------------
 # Hourly signed traffic rollup POSTed to https://2plot.ai/api/satellite/traffic
 # so the hub's owner-only /traffic dashboard can chart this app alongside the
 # rest of the network. No-op without CROSS_APP_WEBHOOK_SECRET.
 #
 # Reports under SATELLITE_APP_KEY — "emojimart", this app's key in the hub's
-# network directory. The donor copy of this module defaulted to "boilerplate";
-# leaving that in place would have overwritten the boilerplate's rows on the
-# hub, so the default is localised in lib/satellite_reporter.py and render.yaml
-# sets it explicitly.
+# network directory.
+#
+# That key is claimed at the FORK POINT at the top of this file, not in the
+# reporter. lib/satellite_reporter.py is byte-copied from the boilerplate and
+# must STAY byte-identical (shasum against the template's copy is the sync's
+# acceptance check), so its own fallback necessarily still reads "boilerplate";
+# localising it here — which is what this site used to do — is exactly the edit
+# the next template sync would silently revert, putting this app's traffic back
+# on the boilerplate's hub row.
 # ----------------------------------------------------------------------------
 from lib.satellite_reporter import start_reporter  # noqa: E402
 

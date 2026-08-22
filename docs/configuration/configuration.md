@@ -5,6 +5,7 @@ endpoint: "/configuration"
 package: dash-emoji-mart
 category: "Configuration"
 icon: "tabler:adjustments"
+lastmod: 2026-08-01
 ---
 
 .. llms_copy::Configuration

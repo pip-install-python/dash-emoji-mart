@@ -5,6 +5,7 @@ endpoint: "/api-reference"
 package: dash-emoji-mart
 category: "Start here"
 icon: "tabler:list-details"
+lastmod: 2026-08-01
 ---
 
 .. llms_copy::API Reference

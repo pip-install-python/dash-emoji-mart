@@ -30,6 +30,7 @@ import pytest
 pytest.importorskip("dash_mantine_components")
 pytest.importorskip("dash_improve_my_llms")
 
+from conftest import REPO_ROOT
 from lib import bulletin
 
 
@@ -105,9 +106,42 @@ def test_the_app_id_is_this_satellite_not_the_template(monkeypatch):
     assert bulletin.app_id() == "leaflet"
 
 
-def test_the_app_id_falls_back_to_this_repos_directory_key(monkeypatch):
+def test_the_fork_point_claims_this_repos_directory_key():
+    """run.py owns the identity claim, and this pins the line that makes it.
+
+    The gate wave moved this guarantee. lib/satellite_reporter.py is byte-copied
+    from the boilerplate and must STAY byte-identical — `shasum` against the
+    template's copy is the sync's acceptance check — so its own fallback reads
+    "boilerplate" and always will. Localising it here, which is what this repo
+    used to do, is precisely the edit the next template sync reverts silently,
+    putting this app's traffic back on the boilerplate's hub row.
+
+    So the claim lives at the FORK POINT in run.py instead: a setdefault that
+    runs before any hub-facing import. A real env value still wins; the line
+    only closes the unset gap. It is one string, it is easy to forget when
+    forking, and its absence is invisible until someone reads the hub's board —
+    which is the entire reason it is pinned from the test suite.
+    """
+    source = (REPO_ROOT / "run.py").read_text()
+    assert 'os.environ.setdefault("SATELLITE_APP_KEY", "emojimart")' in source, (
+        "run.py no longer claims this app's network identity — an unset "
+        "SATELLITE_APP_KEY now files emojimart's traffic under the template's "
+        "row on the hub."
+    )
+
+
+def test_the_donor_fallback_is_left_alone(monkeypatch):
+    """The byte-copied reporter still says "boilerplate", and that is correct.
+
+    Asserted rather than merely tolerated: a well-meaning future reader who
+    "fixes" this fallback breaks the shasum acceptance check, and the failure
+    surfaces a release later as traffic on the wrong hub row. The fork point
+    above is the sanctioned fix; this is the guard rail beside it.
+    """
+    from lib import satellite_reporter
+
     monkeypatch.delenv("SATELLITE_APP_KEY", raising=False)
-    assert bulletin.app_id() == "emojimart"
+    assert satellite_reporter.app_key() == "boilerplate"
 
 
 def test_the_app_id_matches_the_traffic_reporters(monkeypatch):
@@ -128,14 +162,18 @@ def test_every_hub_surface_names_this_app_the_same_way(monkeypatch):
     "dash-emoji-mart" (the PyPI package name) while `satellite_reporter` and
     render.yaml already said "emojimart".
 
-    The donor also checks `hub_client`; this repo has none — see the note in
-    tests/test_internal_traffic.py.
+    lib/hub_client.py presents a fourth (the gate wave ported it); its own
+    fallback already says "emojimart".
     """
     from lib import ad_client, satellite_reporter
     from lib.constants import APP_KEY
 
-    for key in ("SATELLITE_APP_KEY", "AD_APP_ID"):
-        monkeypatch.delenv(key, raising=False)
+    # As a BOOTED app has them: run.py's fork point sets SATELLITE_APP_KEY
+    # before any of these modules import, so this is the real deployed state
+    # and not a contrivance. AD_APP_ID stays unset — ad_client falls back to
+    # this repo's own APP_KEY, which is the drift this test was written for.
+    monkeypatch.delenv("AD_APP_ID", raising=False)
+    monkeypatch.setenv("SATELLITE_APP_KEY", "emojimart")
 
     assert APP_KEY == "emojimart"
     assert ad_client.APP_ID == "emojimart"

@@ -24,9 +24,9 @@ import dash_mantine_components as dmc
 import frontmatter
 from dash_improve_my_llms import register_page_metadata
 from markdown2dash import Admonition, BlockExec, Divider, Image, create_parser
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 
-from lib import markdown_inline, page_tiers
+from lib import gate_layouts, markdown_inline, page_tiers, page_visibility
 from lib.ad_client import inject_ad_into_aside
 from lib.constants import (
     NAME_CONTENT_MAP,
@@ -57,9 +57,29 @@ class Meta(BaseModel):
     category: Optional[str] = None
     icon: Optional[str] = None
     # Who may read this page: public | auth | admin | hidden. Absent means
-    # public — see lib/page_tiers.py for the tier model and why the default
-    # is open. Enforced only when access control is wired in run.py.
+    # the deployment default (PAGE_DEFAULT_TIER, else public) — see
+    # lib/page_tiers.py for the tier model and why the default is open.
+    # Enforced only when access control is wired in run.py.
     tier: Optional[str] = None
+    # The second axis: does the machine twin (/<page>/llms.txt, crawler HTML,
+    # the prerender) stay open while the interactive page is gated? Absent
+    # defers to LLMS_PUBLIC_DEFAULT (unset = open — the data-window posture,
+    # which is how this site ships). Only meaningful on `auth` pages; see
+    # lib/page_tiers.get_llms_public.
+    llms_public: Optional[bool] = None
+    # Sitemap <lastmod>, YYYY-MM-DD, emitted VERBATIM by dash-improve-my-llms
+    # >= 2.6.0 and omitted entirely when absent. Truth or silence: set it when
+    # the page's content genuinely changes, so the frontmatter edit rides the
+    # same commit as the prose. Never script it from file mtimes — those reset
+    # on every Docker build, which is precisely the invented daily "today"
+    # 2.6.0 exists to end. The validator exists because YAML parses a bare
+    # `lastmod: 2026-08-21` into datetime.date before pydantic ever sees it.
+    lastmod: Optional[str] = None
+
+    @field_validator("lastmod", mode="before")
+    @classmethod
+    def _lastmod_to_iso(cls, value):
+        return value.isoformat() if hasattr(value, "isoformat") else value
 
 
 # The directive line AND the indented `:option: value` lines that belong to it.
@@ -215,14 +235,31 @@ for file in files:
         title=PAGE_TITLE_PREFIX + metadata.name,
         description=metadata.description,
         image_url=OG_IMAGE_URL,
-        layout=layout,
+        # The tree above is still built once, here. gated_layout only decides
+        # PER RENDER whether the visitor receives it or the sign-in/forbidden/
+        # 404 card (lib/gate_layouts.py). With every tier public — how this
+        # site ships — the verdict is a dict lookup that always says allow, so
+        # an ungated deploy pays essentially nothing for the capability.
+        layout=gate_layouts.gated_layout(
+            metadata.endpoint, metadata.name, layout
+        ),
         category=metadata.category,
         icon=metadata.icon,
     )
 
-    # Record the declared tier before the prose is registered, so a gate can
+    # Record the declared tiers before the prose is registered, so a gate can
     # never be applied later than the content it is meant to gate.
-    page_tiers.register(metadata.endpoint, metadata.tier)
+    #
+    # ONE declared value, TWO ledgers. The control board's row first —
+    # overrides written there win at resolution time (lib.access.local_tier),
+    # which is what makes a board toggle apply live rather than at the next
+    # deploy. Then the network ledger: what the hub's tier ceiling compares
+    # against, and what lib.access enforces underneath any override.
+    page_visibility.register_default(metadata.endpoint, metadata.name,
+                                     visibility=metadata.tier,
+                                     llms_public=metadata.llms_public)
+    page_tiers.register(metadata.endpoint, metadata.tier,
+                        llms_public=metadata.llms_public)
 
     # Feed the directive-expanded markdown to dash-improve-my-llms so
     # /<page>/llms.txt serves real prose with the example source inlined.
@@ -259,6 +296,11 @@ for file in files:
         path=metadata.endpoint,
         name=metadata.name,
         description=metadata.description,
+        # Emitted verbatim into <lastmod> by dash-improve-my-llms >= 2.6.0 —
+        # the floor run.py enforces — and the tag is omitted entirely when
+        # this is None. Truth or silence; tests/test_seo_icons.py pins that no
+        # date reaches the sitemap that no page declared.
+        lastmod=metadata.lastmod,
         llms_doc=_build_llms_doc(
             metadata.name, metadata.description, expanded, metadata.endpoint
         ),

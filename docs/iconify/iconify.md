@@ -5,6 +5,7 @@ endpoint: "/iconify"
 package: dash-emoji-mart
 category: "Custom emojis"
 icon: "simple-icons:iconify"
+lastmod: 2026-08-02
 ---
 
 .. llms_copy::Iconify Icon Sets

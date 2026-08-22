@@ -6,27 +6,62 @@ clientside callbacks (theme storage + Mantine forceColorScheme) keep working,
 AND the docs pages' `theme` sync — several examples drive `DashEmojiMart.theme`
 off the same id.
 
-Unlike the dash-leaflet2 copy this header has no Clerk avatar: the emoji-mart
-docs are fully public and the site ships without an auth layer.
+The Clerk avatar sits beside the theme toggle and returns None whenever Clerk
+is unconfigured — which is how this site ships today (PAGE_DEFAULT_TIER=public,
+no CLERK_* keys), so the header renders exactly as it did before. The widget
+exists so the phase-4 flip is an environment change and not a code change.
 """
 import dash_mantine_components as dmc
-from dash import Input, Output, clientside_callback
+from dash import Input, Output, State, clientside_callback
 from dash_iconify import DashIconify
 
 from lib.backend import get_backend_info
-from lib.constants import EMOJI_MART_VERSION, GITHUB_URL
+from lib.constants import EMOJI_MART_VERSION, GITHUB_URL, HEADER_HEIGHT
 
 
-def create_link(icon, href):
+def create_clerk_avatar():
+    """Clerk avatar / sign-in control, sat beside the colour-scheme toggle.
+
+    Returns None when Clerk is not configured, so local development and every
+    deploy without the keys renders the header exactly as before rather than
+    erroring on a missing package. `lib/auth.py` registers Clerk with
+    `headless=True`, meaning dash-clerk-auth injects NO UI of its own — without
+    this widget there is no way to sign in even once Clerk initialises.
+    """
+    from lib.auth import clerk_enabled
+
+    if not clerk_enabled():
+        return None
+    from dash_clerk_auth import create_clerk_menu
+
+    return create_clerk_menu(show_dropdown=True, dropdown_align="right")
+
+
+def create_link(icon, href, label):
+    """An external-link icon button.
+
+    ``label`` is REQUIRED, and positionally so — an icon-only control has no
+    accessible name, so a screen reader announces it as "link" and an agent
+    driving the page cannot tell what it does. Making the parameter mandatory
+    is what stops the next link being added without one. It lands on both the
+    anchor and the button.
+
+    `aria-label` and never `title=`: DMC 2.8's ActionIcon/Anchor accept
+    `aria-*` wildcards but REJECT `title`, raising TypeError during app
+    construction — a tooltip typo takes the whole site down rather than
+    rendering wrong. Hover text, where it is wanted, is `dmc.Tooltip`.
+    """
     return dmc.Anchor(
         dmc.ActionIcon(
             DashIconify(icon=icon, width=22),
             variant="subtle",
             size="lg",
             color="gray",
+            **{"aria-label": label},
         ),
         href=href,
         target="_blank",
+        **{"aria-label": label},
     )
 
 
@@ -90,6 +125,7 @@ def create_header(data):
                             size="lg",
                             color="gray",
                             hiddenFrom="md",
+                            **{"aria-label": "Open navigation menu"},
                         ),
                         dmc.Burger(
                             id="desktop-navbar-toggle",
@@ -97,6 +133,7 @@ def create_header(data):
                             size="sm",
                             visibleFrom="md",
                             color="var(--mantine-color-yellow-6)",
+                            **{"aria-label": "Toggle navigation sidebar"},
                         ),
                         dmc.Anchor(
                             dmc.Group(
@@ -149,7 +186,8 @@ def create_header(data):
                     [
                         dmc.Box(_openapi_link(), visibleFrom="md"),
                         create_search(data),
-                        create_link("radix-icons:github-logo", GITHUB_URL),
+                        create_link("radix-icons:github-logo", GITHUB_URL,
+                                    "dash-emoji-mart on GitHub"),
                         dmc.ActionIcon(
                             [
                                 DashIconify(
@@ -167,13 +205,15 @@ def create_header(data):
                             color="yellow",
                             id="color-scheme-toggle",
                             size="lg",
+                            **{"aria-label": "Toggle light and dark theme"},
                         ),
+                        create_clerk_avatar(),
                     ],
                     gap="sm",
                 ),
             ],
             justify="space-between",
-            h=70,
+            h=HEADER_HEIGHT,
             px="xl",
         ),
     )
@@ -190,11 +230,29 @@ clientside_callback(
     Input("select-component", "value"),
 )
 
-# Mobile drawer open
+# Mobile drawer search → navigate. The header Select is hidden below `sm`, so
+# on a phone the drawer's own copy is the only search there is.
 clientside_callback(
-    """function(n_clicks) { return true }""",
+    """
+    function(value) {
+        if (value) { return value }
+        return window.dash_clientside.no_update
+    }
+    """,
+    Output("url", "href", allow_duplicate=True),
+    Input("mobile-select-component", "value"),
+    prevent_initial_call=True,
+)
+
+# Drawer TOGGLE, not open. The network-standard drawer leaves the header
+# uncovered so the hamburger stays reachable while it is open — which makes a
+# second tap on it the obvious way to close, and a no-op the obvious bug.
+# Reading `opened` as State is the whole fix.
+clientside_callback(
+    """function(n_clicks, opened) { return !opened }""",
     Output("components-navbar-drawer", "opened"),
     Input("drawer-hamburger-button", "n_clicks"),
+    State("components-navbar-drawer", "opened"),
     prevent_initial_call=True,
 )
 

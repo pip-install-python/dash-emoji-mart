@@ -5,6 +5,7 @@ endpoint: "/custom-emojis"
 package: dash-emoji-mart
 category: "Custom emojis"
 icon: "tabler:photo-plus"
+lastmod: 2026-08-01
 ---
 
 .. llms_copy::Custom Emojis
