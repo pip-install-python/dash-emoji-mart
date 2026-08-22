@@ -82,13 +82,34 @@ python-frontmatter
 # govern. Below it the tier wiring in run.py is dead code and nothing says so;
 # run.py enforces this same floor at boot for exactly that reason.
 #
-# 2.6.0 is the gate-wave floor. It ends the invented sitemap date: `lastmod=`
+# 2.6.1 is the floor. Two reasons, and the second is why this line is a FLOOR
+# rather than a comment:
+#
+# 2.6.1 makes the universal prerender VISIBLE to non-JS consumers. At 2.6.0 and
+# below the injected block carries a literal `hidden` attribute, so every
+# visibility-respecting reader — html-to-text extractors, and arguably crawler
+# content-weighting — saw "Loading..." and nothing else, while the prose sat
+# right there in the markup. An outside audit read six hosts that way on
+# 2026-08-22. JS browsers are unaffected either way: React's mount wipes the
+# block, so the fix costs humans nothing.
+#
+# And the version had to be WRITTEN here, not merely permitted. `>=2.6.0` let
+# the resolver pick 2.6.1 in principle, but Docker caches the dependency layer
+# on this file's contents: a deploy that changes only application code is a
+# cache hit, pip never re-resolves, and the image keeps whatever it first
+# installed. Measured live on 2026-08-22 — the deploy that was supposed to
+# "pick up 2.6.1" served 2.6.0's hidden div. Editing this line is what
+# invalidates the layer, so the floor and the delivery mechanism are the same
+# act.
+#
+# 2.6.0 remains the gate-wave floor beneath it. It ends the invented sitemap
+# date: `lastmod=`
 # on register_page_metadata is emitted VERBATIM and omitted when absent, where
 # 2.5.x swallowed it into **kwargs and kept stamping build dates on every URL.
 # It also adds icon autodiscovery (this site still declares configure_seo(
 # icons=[...]) explicitly — declared wins, and tests/test_seo_icons.py pins
 # that the two sets agree) and the JSON-LD publisher logo.
-dash-improve-my-llms[flask]>=2.6.0
+dash-improve-my-llms[flask]>=2.6.1
 python-dotenv>=1.0
 pydantic>=2.0
 requests>=2.31

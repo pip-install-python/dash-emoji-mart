@@ -115,6 +115,11 @@ from lib.constants import (
 # /llms-full.txt) that the LLMS_SMALL_TIER / LLMS_FULL_TIER knobs govern.
 # Below it the tier registrations further down are dead code and nothing says so.
 #
+#   * 2.6.1 makes the universal prerender visible to non-JS consumers: at
+#     2.6.0 the injected block shipped with a literal `hidden` attribute, so
+#     text extractors saw "Loading..." and nothing else while the prose sat in
+#     the markup unread. Browsers were never affected — React's mount wipes the
+#     block either way — which is exactly why it went unnoticed for so long.
 #   * 2.6.0 is the gate-wave floor, and it belongs in this list for the same
 #     reason as the rest: below it `lastmod=` on register_page_metadata is
 #     swallowed into **kwargs and SILENTLY IGNORED, so every real date this
@@ -124,7 +129,7 @@ from lib.constants import (
 #     declares configure_seo(icons=) explicitly; tests/test_seo_icons.py pins
 #     that the two sets agree) and the JSON-LD publisher logo.
 # ----------------------------------------------------------------------------
-_DIMLL_FLOOR = (2, 6, 0)
+_DIMLL_FLOOR = (2, 6, 1)
 
 
 def _check_dimll_version() -> str:

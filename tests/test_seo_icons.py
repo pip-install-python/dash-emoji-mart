@@ -83,3 +83,50 @@ def test_sitemap_lastmod_is_verbatim_or_absent(client):
     assert home_block and "<lastmod>" not in home_block.group(0), (
         "The home page's sitemap entry carries a lastmod it never declared."
     )
+
+
+def test_prerender_rides_the_generic_lane_and_is_visible(client):
+    """The universal prerender must be in the initial HTML for a PLAIN client,
+    and must not be `hidden`.
+
+    Two failures, one test, because they were discovered together.
+
+    The lane: every other test in this suite that reads a rendered document
+    fetches with a crawler user-agent, which exercises dash-improve-my-llms'
+    separate BOT-document path. A regression that UA-gated the universal lane
+    would therefore have been invisible here — the crawler tests would keep
+    passing while browsers got an empty shell. This fetches with the default
+    (browser) UA on purpose.
+
+    The visibility: dimll <= 2.6.0 emitted this block with a literal `hidden`
+    attribute, so every visibility-respecting reader — html-to-text extractors,
+    and arguably crawler content-weighting — saw "Loading..." and nothing else
+    while the prose sat in the markup unread. Present and invisible, the worst
+    of both. 2.6.1 serves it visible and hides it with a synchronous inline
+    script only JS browsers run, so humans see no flash and React's mount wipes
+    the pair as before.
+
+    Measured live on this host 2026-08-22: the deploy that was supposed to
+    "pick up 2.6.1" was still serving 2.6.0's hidden div, because `>=2.6.0`
+    permitted the new version without requiring it and Docker's cached
+    dependency layer had no reason to re-resolve. The floor in requirements.txt
+    is >=2.6.1 for exactly that reason, and this is its pin from the app's side.
+    """
+    import re
+
+    for path in ("/", "/popover"):
+        html = client.get(path).text  # default UA — the point of the test
+        div = re.search(r'<div id="dimll-prerender"[^>]*>', html)
+        assert div, (
+            f"{path}: no prerender block for a generic client — the universal "
+            "lane is gated or off"
+        )
+        assert "hidden" not in div.group(0), (
+            f"{path}: the prerender div carries `hidden` again — "
+            "visibility-respecting consumers are back to reading 'Loading...'; "
+            "the dimll floor is >=2.6.1 for exactly this"
+        )
+        assert 'data-dimll-prerender="1">document.getElementById' in html, (
+            f"{path}: the marked synchronous hide script is missing — JS "
+            "browsers would flash the prose before React mounts"
+        )
