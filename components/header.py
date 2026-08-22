@@ -155,12 +155,28 @@ def create_header(data):
                                     ),
                                     dmc.Stack(
                                         [
+                                            # Hidden on xs displays. The mark
+                                            # (the cowboy-hat glyph beside it)
+                                            # carries the brand on a phone,
+                                            # where this wordmark competes with
+                                            # the burger, search, GitHub link,
+                                            # theme toggle and avatar for a
+                                            # header row that has no room for
+                                            # all of them.
+                                            #
+                                            # visibleFrom is CSS-only — Mantine
+                                            # emits a media query and the node
+                                            # stays in the DOM, so the
+                                            # colour-scheme callback further
+                                            # down that writes to this id keeps
+                                            # firing on every viewport.
                                             dmc.Text(
                                                 "dash-emoji-mart",
                                                 size="lg",
                                                 fw=700,
                                                 c="yellow",
                                                 id="dash-docs-title",
+                                                visibleFrom="sm",
                                             ),
                                             dmc.Text(
                                                 f"emoji-mart {EMOJI_MART_VERSION}",
