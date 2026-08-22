@@ -202,15 +202,52 @@ input:invalid {
     }
 }
 
-div .m_46b77525 {
-    margin-top: calc(0.5rem* var(--mantine-scale)) !important;
+/* Wide markdown tables scroll inside their own box instead of dragging the
+   page sideways (a fork measured 105px of horizontal drag at 414px from one
+   prop table). GitHub's markdown recipe: content-width, capped at the
+   container, scrollable past it — a no-op for tables that already fit.
+   Element+class selector so it outranks Mantine's own width rule regardless
+   of stylesheet load order. markdown2dash stamps m2d-table on every table it
+   renders, including the `.. kwargs::` and `.. props::` tables. */
+table.m2d-table {
+    display: block;
+    width: max-content;
+    max-width: 100%;
+    overflow-x: auto;
 }
 
-.m_9cdde9a {
-    inset-inline-end: 0;
-    width: var(--app-shell-aside-width);
-    transform: var(--app-shell-aside-transform);
-    z-index: var(--app-shell-aside-z-index);
+/* NEVER style Mantine's hashed .m_* classes — they are private internals,
+   version-coupled by construction. A rule that stops matching after a bump
+   fails silently; one that starts matching applies geometry to the wrong
+   component. This file carried three of them, and all three did damage:
+
+     .m_b8a05bbd  Mantine's Drawer CONTENT class, pinned to height 63vh with
+                  !important. It beat every style the network-standard drawer
+                  sets, so the mobile nav kept rendering as a floating card no
+                  matter what the component said. Removed 2026-08-21.
+     .m_46b77525  an !important top margin on EVERY Mantine Input wrapper,
+                  and therefore on every input in every docs example on this
+                  site — live distortion, not dead weight. Removed without
+                  replacement; stock Mantine spacing returns.
+     .m_9cdde9a   four declarations restating Mantine's own aside values
+                  (inset, width, transform, z-index) around ONE intentful
+                  pixel: the breathing gap between the header line and the
+                  top of the Table of Contents. That pixel is rescued below;
+                  the restatements are not worth keeping.
+
+   Style the static mantine-<Component>-<part> classes instead, or use the
+   DMC Styles API. tests/test_css_hygiene.py fails on any hashed selector, so
+   the class stays extinct; comments like this one may still name them. */
+
+/* The TOC aside's breathing gap, rescued from the retired .m_9cdde9a fossil.
+   The aside is an AppShellAside wrapping a ScrollArea directly — it carries
+   no padding of its own and sits immediately below the fixed header, so
+   without this the "Table of Contents" heading butts against the header
+   line. Deliberately margin-top ONLY: this site ranks the AppShell sections
+   by raising the HEADER (see the z-index block further down), which is
+   leaflet's variant of that fix rather than the template's aside-lowering
+   one. Both are correct and the two must not be merged into each other. */
+aside.mantine-AppShell-aside {
     margin-top: 15px;
 }
 
