@@ -22,7 +22,26 @@ ENV PYTHONUNBUFFERED=1 \
 
 WORKDIR /app
 
-# Dependencies first so this layer caches across app-code changes.
+# Dependencies first so this layer caches across app-code changes — and that
+# cache is a trap worth naming, because this repo has already fallen into it.
+#
+# Docker keys this layer on requirements.txt's CONTENTS. A commit that touches
+# only application code is a cache hit: pip never re-resolves and the image
+# silently keeps whatever version it was first built with. On 2026-08-22 a
+# deploy meant to "pick up dash-improve-my-llms 2.6.1" shipped 2.6.0 for
+# exactly this reason — the floor said `>=2.6.0`, which PERMITTED the new
+# version without REQUIRING it.
+#
+# So: ship every dependency upgrade as a floor bump in requirements.txt, and
+# grep the number first, because it lives in more than one place (run.py's
+# _DIMLL_FLOOR and its boot message, and the tests that pin the requirements
+# line). The bump IS the cache bust. The boot floor is the other half: it
+# turns a stale image from a silent downgrade into a loud refusal to start.
+#
+# There is deliberately NO nodejs/npm in this image. The component bundle
+# (dash_emoji_mart/dash_emoji_mart.min.js) is committed and CI rebuilds it as
+# a separate job to prove the commit matches source, so nothing here needs a
+# JS toolchain — this is a pure-Python image.
 #
 # requirements.txt contains `-e .`, which needs the package metadata and the
 # package directory present at install time — hence the four COPYs rather than

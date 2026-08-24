@@ -201,8 +201,14 @@
          ======================================================================== -->
 
     <noscript>
+        <!-- No <h1> in here, deliberately: crawlers run no JavaScript and
+             PARSE noscript content, so an h1 in this block becomes a SECOND
+             site-wide h1 on every page, competing with each page's own
+             heading. Caught here by tests/test_pages.py's single-h1 sweep on
+             the day it was ported; the fleet found it first on a sibling fork.
+             The hierarchy below therefore starts at h2. -->
         <div style="padding: 24px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 820px; margin: 0 auto; line-height: 1.6;">
-            <h1>dash-emoji-mart</h1>
+            <h2>dash-emoji-mart</h2>
             <p><strong>An emoji picker for Plotly Dash 4.</strong></p>
             <p>
                 Wraps <a href="https://github.com/missive/emoji-mart" style="color:#e67700;">emoji-mart</a>
@@ -224,13 +230,13 @@
             <p>Every page also serves its own <code>/&lt;page&gt;/llms.txt</code>
                containing the prose plus the complete, runnable example source.</p>
 
-            <h2>Install</h2>
+            <h3>Install</h3>
             <pre style="background:#f5f5f5;padding:12px;border-radius:6px;overflow-x:auto;"><code>pip install dash-emoji-mart</code></pre>
             <p>Requires Python 3.9+ and Dash 4.1+. The compiled JavaScript bundle
                ships inside the package — no Node, no build step, no
                <code>external_scripts</code>.</p>
 
-            <h2>Usage</h2>
+            <h3>Usage</h3>
             <pre style="background:#f5f5f5;padding:12px;border-radius:6px;overflow-x:auto;"><code>from dash import Dash, callback, html, Input, Output
 from dash_emoji_mart import DashEmojiMart
 

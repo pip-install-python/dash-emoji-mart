@@ -110,7 +110,7 @@ def test_prerender_rides_the_generic_lane_and_is_visible(client):
     "pick up 2.6.1" was still serving 2.6.0's hidden div, because `>=2.6.0`
     permitted the new version without requiring it and Docker's cached
     dependency layer had no reason to re-resolve. The floor in requirements.txt
-    is >=2.6.1 for exactly that reason, and this is its pin from the app's side.
+    is >=2.7.1 (2.6.1 for this behaviour) for exactly that reason, and this is its pin from the app's side.
     """
     import re
 
@@ -124,7 +124,7 @@ def test_prerender_rides_the_generic_lane_and_is_visible(client):
         assert "hidden" not in div.group(0), (
             f"{path}: the prerender div carries `hidden` again — "
             "visibility-respecting consumers are back to reading 'Loading...'; "
-            "the dimll floor is >=2.6.1 for exactly this"
+            "the dimll floor is >=2.7.1, and was raised to 2.6.1 for exactly this"
         )
         assert 'data-dimll-prerender="1">document.getElementById' in html, (
             f"{path}: the marked synchronous hide script is missing — JS "

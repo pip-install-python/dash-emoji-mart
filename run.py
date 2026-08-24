@@ -115,6 +115,16 @@ from lib.constants import (
 # /llms-full.txt) that the LLMS_SMALL_TIER / LLMS_FULL_TIER knobs govern.
 # Below it the tier registrations further down are dead code and nothing says so.
 #
+#   * 2.7.1 adds the llms.txt v2 discovery relations (rel=alternate /
+#     describedby, plus the matching Link headers), the text/plain Accept
+#     ramp, and the representation digest — the machine lane's addressing
+#     layer. An agent that cannot discover the alternate representation has
+#     to guess the URL, which is the guessing this network exists to stop.
+#   * 2.7.0 dedups what the prerender injects: below it EVERY page serves a
+#     duplicate H1 to crawlers (the injected header plus the document body's
+#     own) and the home footer doubles its /llms.txt link. It also hardens
+#     the idempotency probe, so a page that merely MENTIONS the prerender
+#     marker no longer loses its prerender entirely.
 #   * 2.6.1 makes the universal prerender visible to non-JS consumers: at
 #     2.6.0 the injected block shipped with a literal `hidden` attribute, so
 #     text extractors saw "Loading..." and nothing else while the prose sat in
@@ -129,7 +139,7 @@ from lib.constants import (
 #     declares configure_seo(icons=) explicitly; tests/test_seo_icons.py pins
 #     that the two sets agree) and the JSON-LD publisher logo.
 # ----------------------------------------------------------------------------
-_DIMLL_FLOOR = (2, 6, 1)
+_DIMLL_FLOOR = (2, 7, 1)
 
 
 def _check_dimll_version() -> str:
@@ -150,8 +160,18 @@ def _check_dimll_version() -> str:
         raise RuntimeError(
             f"dash-improve-my-llms {raw} is installed, but this site needs "
             f">= {floor}.\n"
-            f"  Below {floor} the home page serves a stub to crawlers and the "
-            f"network directory vanishes — both silently.\n"
+            f"  Below 2.7.1 the llms.txt v2 discovery relations "
+            f"(rel=alternate/describedby + Link headers), the text/plain "
+            f"Accept ramp and the representation digest are missing.\n"
+            f"  Below 2.7.0 every page serves a DUPLICATE H1 to crawlers "
+            f"(the injected prerender header plus the document's own), the "
+            f"home footer doubles its /llms.txt link, and a page that merely "
+            f"MENTIONS the prerender marker loses its prerender entirely.\n"
+            f"  Below 2.6.1 the prerender ships `hidden`, so text extractors "
+            f"read 'Loading...' instead of the page's prose.\n"
+            f"  Below 2.6.0 <lastmod> reverts to invented build dates, and "
+            f"lower still the home page serves a stub to crawlers and the "
+            f"network directory vanishes — all of it silently.\n"
             f"  Interpreter: {sys.executable}\n"
             f"  Fix: pip install -r requirements.txt   (and RESTART the server; "
             f"a running process keeps the old version in memory)"

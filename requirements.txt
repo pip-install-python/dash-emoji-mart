@@ -82,7 +82,16 @@ python-frontmatter
 # govern. Below it the tier wiring in run.py is dead code and nothing says so;
 # run.py enforces this same floor at boot for exactly that reason.
 #
-# 2.6.1 is the floor. Two reasons, and the second is why this line is a FLOOR
+# 2.7.1 is the floor. It buys the machine lane's addressing layer — the
+# llms.txt v2 discovery relations (rel=alternate / describedby, with matching
+# Link headers), the text/plain Accept ramp and the representation digest —
+# on top of 2.7.0, which dedups what the prerender injects: below 2.7.0 every
+# page serves crawlers a DUPLICATE H1 (the injected header plus the document's
+# own) and the home footer doubles its /llms.txt link. 2.7.0 also hardens the
+# idempotency probe so a page that merely MENTIONS the prerender marker keeps
+# its prerender.
+#
+# 2.6.1 remains beneath it. Two reasons, and the second is why this line is a FLOOR
 # rather than a comment:
 #
 # 2.6.1 makes the universal prerender VISIBLE to non-JS consumers. At 2.6.0 and
@@ -109,7 +118,7 @@ python-frontmatter
 # It also adds icon autodiscovery (this site still declares configure_seo(
 # icons=[...]) explicitly — declared wins, and tests/test_seo_icons.py pins
 # that the two sets agree) and the JSON-LD publisher logo.
-dash-improve-my-llms[flask]>=2.6.1
+dash-improve-my-llms[flask]>=2.7.1
 python-dotenv>=1.0
 pydantic>=2.0
 requests>=2.31

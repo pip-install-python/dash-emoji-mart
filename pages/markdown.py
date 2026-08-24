@@ -108,6 +108,9 @@ _LANG_MAP = {
 }
 
 
+_DIRECTIVE_OPTION = re.compile(r"^[ \t]+:[^\n]*$")
+
+
 def _expand_source_directives(markdown_content: str) -> str:
     """Inline `.. source::path` directives with the referenced file's content.
 
@@ -115,10 +118,28 @@ def _expand_source_directives(markdown_content: str) -> str:
     Substituting the real file is what makes that output self-contained for the
     "paste the page into a chat window" audience — a bare directive name would
     be useless there.
+
+    FENCE-AWARE, and it has to be. A `.. source::` inside a fenced code block
+    is documentation SHOWING the syntax, not a directive to run. Expanding it
+    injects a ```python fence inside the already-open fence, which closes that
+    fence early — and from there the inlined Python file is parsed as markdown,
+    so every `# comment` line becomes an <h1> and the page's machine lane
+    serves broken structure. The browser lane never showed it, because
+    markdown2dash parses fences properly; only /llms.txt and the prerender
+    were wrong. tests/test_pages.py's single-h1 pin is what catches a
+    regression here.
+
+    This site's docs do not currently teach the directive inside a fence, so
+    today the guard is inert — it is ported because the failure is silent, and
+    a tutorial page is exactly the kind of thing a docs site adds later.
+
+    Line-walked rather than regex-substituted, because this repo's directive
+    match spans the directive line PLUS its indented `:option:` lines (see
+    _SOURCE_DIRECTIVE — leaving those behind ships them into llms.txt as
+    orphaned noise). Both behaviours have to survive together.
     """
 
-    def replace(match: "re.Match") -> str:
-        file_path = match.group("path").strip()
+    def expand(file_path: str) -> str:
         try:
             full = Path(file_path)
             content = full.read_text()
@@ -130,7 +151,32 @@ def _expand_source_directives(markdown_content: str) -> str:
         except Exception as exc:  # noqa: BLE001 - never break page registration
             return f"\n<!-- Error reading {file_path}: {exc} -->\n"
 
-    return _SOURCE_DIRECTIVE.sub(replace, markdown_content)
+    lines = markdown_content.split("\n")
+    out: List[str] = []
+    fence = None  # the marker that opened the block we are inside, if any
+    i = 0
+    while i < len(lines):
+        line = lines[i]
+        head = line.lstrip()[:3]
+
+        if fence is None and head in ("```", "~~~"):
+            fence = head
+        elif fence is not None and head == fence:
+            fence = None
+        elif fence is None and line.startswith(".. source::"):
+            path_text = line[len(".. source::"):].strip()
+            i += 1
+            # Consume the directive's own indented options so they do not
+            # survive as loose text once the directive itself is gone.
+            while i < len(lines) and _DIRECTIVE_OPTION.match(lines[i]):
+                i += 1
+            out.append(expand(path_text))
+            continue
+
+        out.append(line)
+        i += 1
+
+    return "\n".join(out)
 
 
 def _build_llms_doc(name: str, description: str, expanded: str, path: str) -> str:
