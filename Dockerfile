@@ -78,9 +78,34 @@ COPY . .
 # system temp directory, which also works but is less obvious to operate.
 ENV DASH_EMOJI_MART_CACHE_DIR=/tmp/iconify-cache
 
+# The 2plot.ai hub sweeps /healthz hourly and render.yaml names it as this
+# service's healthCheckPath; the container gets the same probe so an
+# unhealthy process is visible to the orchestrator too, not only to the
+# platform's external check.
+#
+# A python -c probe rather than the template's `curl -fsS`: this image
+# apt-installs NOTHING (it is a pure-Python docs site — the component bundle
+# is committed, so there is no Node layer either), and adding an apt layer
+# for one probe binary costs a package index refresh and ~10MB on every
+# build. python is already PID 1's interpreter. Sanctioned alternative in
+# the 1.6.14 sync spec; recorded in DIVERGENCES.md.
+#
+# ${PORT:-8050} in the probe as well as the CMD: the two must agree, and a
+# hardcoded port in either is how a container reports healthy on a port
+# nothing is listening on.
+HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
+    CMD python -c "import os,urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:'+os.environ.get('PORT','8050')+'/healthz', timeout=4).status==200 else 1)" || exit 1
+
 # Documentation only; the process actually binds to $PORT (below).
 EXPOSE 8050
 
 # run:server is the Flask WSGI callable (run.py: `server = app.server`).
-# Shell form so ${PORT} / ${WEB_CONCURRENCY} expand when the container starts.
-CMD gunicorn run:server --bind "0.0.0.0:${PORT}" --workers "${WEB_CONCURRENCY:-2}" --threads 4 --timeout 120 --access-logfile - --error-logfile -
+# Shell form so ${PORT} / ${WEB_CONCURRENCY} expand when the container starts
+# — exec-form CMD never expands env, which is how a sibling image hardcoded
+# its port no matter what the platform asked for (template 1.6.14).
+#
+# `${PORT:-8050}`, not bare `${PORT}`: the ENV above supplies the default for
+# a normal run, but `docker run -e PORT= ` (or any orchestrator that passes
+# the variable through empty) collapses the bind to "0.0.0.0:" and gunicorn
+# dies at startup. The default belongs at the point of use.
+CMD gunicorn run:server --bind "0.0.0.0:${PORT:-8050}" --workers "${WEB_CONCURRENCY:-2}" --threads 4 --timeout 120 --access-logfile - --error-logfile -
