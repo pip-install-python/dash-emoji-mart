@@ -275,3 +275,38 @@ def test_the_superseded_site_title_is_gone():
         stripped = re.sub(r"#.*", "", text) if path.endswith(".py") else text
         stripped = re.sub(r"<!--.*?-->", "", stripped, flags=re.S)
         assert old not in stripped, f"{path} still carries the superseded title"
+
+
+def test_the_retired_domain_is_gone_everywhere():
+    """`pip-install-python.com` is retired; this site publishes 2plot.dev.
+
+    Third time this file has been touched for the same domain, which is the
+    reason for a pin rather than a third fix. The gate-wave round replaced
+    three retired URLs here and added no guard, so the one remaining
+    occurrence — a `contactPoint.email` inside the Organization JSON-LD —
+    survived two more passes unseen. Structured data is exactly where a dead
+    address hides: nothing renders it, nothing links it, and the only
+    consumers are crawlers and assistants that will publish it as the way to
+    reach this project.
+
+    The whole `contactPoint` came out rather than just the address. A
+    ContactPoint carrying `@type` and `contactType` with no channel asserts
+    that support exists and gives no way to reach it — worse than declaring
+    nothing. `sameAs` (GitHub, YouTube, LinkedIn) remains, and every entry
+    there is live.
+
+    Comments are stripped first: an explanatory comment naming the retired
+    domain must not trip its own guard (the marker-in-comment lesson, same as
+    the noscript h1 pin in tests/test_pages.py).
+    """
+    retired = "pip-install-python.com"
+    for path in ("lib/constants.py", "templates/index.html", "run.py"):
+        text = (REPO_ROOT / path).read_text()
+        text = re.sub(r"<!--.*?-->", "", text, flags=re.S)
+        if path.endswith(".py"):
+            text = re.sub(r"#.*", "", text)
+        assert retired not in text, (
+            f"{path} still names the retired domain {retired!r} — this site "
+            "publishes 2plot.dev, and a crawler reading a dead contact "
+            "address publishes it as the way to reach this project"
+        )
