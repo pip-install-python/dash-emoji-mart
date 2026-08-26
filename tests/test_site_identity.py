@@ -146,15 +146,39 @@ def test_readme_states_the_brand():
 
 
 def test_llms_package_floor_is_the_network_standard():
-    """Identity resolution lives in the package; the floor is what delivers it."""
+    """Identity resolution lives in the package; the floor is what delivers it.
+
+    THE FIFTH ENCODING. This gate sat at (2, 5, 1) through the 2026-08-23
+    floor round and the 2026-08-24 CI repair — both of which moved every
+    encoding they knew about — because a floor's encodings hide in more
+    places than a spec's detect samples. A gate two releases below the
+    requirements floor can never fire: the resolver installs >=2.7.1, so
+    this asserted nothing at all while reading as a guard. That is the
+    failure mode this fork filed upstream as SYNC-1.6.10-1.6.16 item 2's
+    negative check, and the check found it here on its own repo.
+
+    The ladder EXTENDS rather than rewrites — each rung is why the floor
+    could not go back below it:
+
+      * 2.7.1 is the floor. Below 2.7.0 every page serves a duplicate H1
+        to crawlers; 2.7.0 also carries the geo guardrail lib/health.py
+        reports, which is the wire-side tell for the Docker cache trap.
+      * 2.6.1 stopped shipping the prerender block with a literal
+        `hidden` attribute, so text extractors could see it at all.
+      * 2.6.0 ended the invented <lastmod> build dates in the sitemap.
+      * 2.5.1 is the 402-instrumentation rung: below it the tier wiring
+        in run.py is dead code and the prerender's title handling
+        reverts to the pre-2.5 override this suite used to pin.
+    """
     import dash_improve_my_llms as pkg
 
     parts = tuple(int(p) for p in pkg.__version__.split(".")[:3] if p.isdigit())
-    assert parts >= (2, 5, 1), (
-        f"dash-improve-my-llms {pkg.__version__} is below the network's "
-        "402-instrumentation floor; the tier wiring in run.py would be dead "
-        "code and the prerender's title handling reverts to the pre-2.5 "
-        "override this suite used to pin"
+    assert parts >= (2, 7, 1), (
+        f"dash-improve-my-llms {pkg.__version__} is below the 2.7.1 floor — "
+        "the same number requirements.txt, run.py's _DIMLL_FLOOR and both "
+        "ci.yml asserts state. Every encoding moves together or the ones "
+        "left behind stop guarding silently; see this test's docstring for "
+        "the rationale ladder."
     )
 
 
