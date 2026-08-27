@@ -36,7 +36,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Run actionlint
         run: |
           bash <(curl -fsSL https://raw.githubusercontent.com/rhysd/actionlint/main/scripts/download-actionlint.bash)
@@ -71,9 +71,9 @@ jobs:
           - dash: "4.4.1"
             python: "3.13"
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with:
           python-version: ${{ matrix.python }}
           cache: pip
@@ -81,7 +81,7 @@ jobs:
       # node is what makes the clientside-JS syntax check real. Without it the
       # smoke test SKIPS that check rather than failing, so a broken
       # clientside_callback would sail straight through.
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: "20"
 
@@ -190,7 +190,7 @@ jobs:
       - name: Smoke test
         run: python scripts/smoke_test.py --json smoke-${{ matrix.dash }}-py${{ matrix.python }}.json
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: smoke-${{ matrix.dash }}-py${{ matrix.python }}
@@ -201,12 +201,12 @@ jobs:
     name: Rebuild the JS bundle from source
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: "20"
           cache: npm
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with:
           # PACKAGE lane, deliberately not the fleet Python. This job runs
           # dash-generate-components over src/ to reproduce the shipped
@@ -243,13 +243,13 @@ jobs:
     name: Build + verify the wheel
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           # check_release.py compares the git commit times of the bundle and
           # src/. A shallow clone can omit the commit that last touched one of
           # them, turning the check into a false "no git history" skip.
           fetch-depth: 0
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with:
           # PACKAGE lane — the interpreter that BUILDS the wheel, not one the
           # site runs. Moving it with the image would be conflating the two
@@ -324,7 +324,7 @@ jobs:
           echo "pyproject=$PY_VER  installed=$WHEEL_VER"
           test "$PY_VER" = "$WHEEL_VER"
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: dist
           path: dist/
@@ -342,10 +342,10 @@ jobs:
         # package's floor is not the docs site's.
         python: ["3.9", "3.10", "3.11", "3.12", "3.13"]
     steps:
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with:
           python-version: ${{ matrix.python }}
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           name: dist
           path: dist/
@@ -406,9 +406,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with:
           # SITE lane: the host interpreter that runs the battery against the
           # container. Held to the image's minor by
@@ -508,8 +508,8 @@ jobs:
     timeout-minutes: 10
     continue-on-error: true
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           # SITE lane: this job resolves requirements.txt, so it must resolve
           # it on the interpreter production runs, or it audits a different
