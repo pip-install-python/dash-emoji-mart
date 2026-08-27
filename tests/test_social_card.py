@@ -179,7 +179,41 @@ def test_the_declared_ratio_suits_a_large_image_card():
 
 
 def test_the_twitter_card_is_a_large_image(client):
-    assert _meta(client.get("/").text, "twitter:card") == ["summary_large_image"]
+    assert set(_meta(client.get("/").text, "twitter:card")) == {"summary_large_image"}
+
+
+def test_the_twitter_card_is_declared_in_the_form_the_spec_names(client):
+    """The one tag index.html declares even though Dash emits it too.
+
+    Dash writes its whole per-page meta set with `property=` (dash/_pages.py).
+    That is correct for OpenGraph, which defines itself on RDFa, and wrong for
+    the Twitter card, which the spec defines on `name=`. So a Dash site that
+    leans on Dash alone declares `property="twitter:card"` in the browser
+    document, while dash-improve-my-llms declares `name="twitter:card"` in the
+    crawler document — the same site telling two consumers two different
+    things about itself.
+
+    In practice X, Slack and LinkedIn all fetch the crawler lane on this host
+    (verified by user-agent on 2026-08-26), so the browser lane's form was
+    costing no unfurl. The reason to fix it anyway is that identity parity
+    between the two documents is the invariant, not any single scraper's
+    leniency; `scripts/smoke_live.py`'s parity block asserts it after every
+    deploy, and this is the offline half.
+
+    Pinning BOTH forms is the point. Dropping the static one loses the spec
+    form; dropping Dash's is not this repo's to do; and either one changing
+    value while the other does not is the drift worth catching.
+    """
+    html = client.get("/").text
+    for attr in ("name", "property"):
+        found = re.findall(
+            rf'<meta[^>]*{attr}="twitter:card"[^>]*content="([^"]*)"', html
+        )
+        assert found == ["summary_large_image"], (
+            f'{attr}="twitter:card" is {found}, expected exactly one '
+            '"summary_large_image" — the static tag lives in '
+            "templates/index.html, Dash's comes from register_page"
+        )
 
 
 def test_no_meta_tag_dash_emits_is_also_declared_statically(client):
@@ -189,10 +223,18 @@ def test_no_meta_tag_dash_emits_is_also_declared_statically(client):
     of each, and the static one describes the SITE where Dash's describes the
     PAGE — so the duplicate is both redundant and the less accurate of the
     two. Every one of these shipped doubled before the rollout.
+
+    `twitter:card` is deliberately NOT in this list, and its absence is the
+    interesting part. The rule above rests on the static copy being the less
+    accurate one, which is true of every per-page value here and false of the
+    card type: it is `summary_large_image` on every page of this site. With no
+    accuracy to lose, the duplicate buys the `name=` form the spec defines and
+    Dash never emits — see the test above, which pins that pair exactly, so
+    the tag is not merely exempted here but checked harder elsewhere.
     """
     html = client.get("/").text
     for tag in ("description", "og:type", "og:title", "og:description",
-                "og:image", "twitter:card", "twitter:url", "twitter:title",
+                "og:image", "twitter:url", "twitter:title",
                 "twitter:description", "twitter:image"):
         found = _meta(html, tag)
         assert len(found) <= 1, f"{tag} is declared {len(found)} times: {found}"

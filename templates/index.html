@@ -92,7 +92,25 @@
     <meta property="og:image:alt" content="dash-emoji-mart — emoji picker for Dash">
 
     <!-- Same rule: Dash emits twitter:card/url/title/description/image per
-         page. Only the alt text is missing from its set. -->
+         page. Only the alt text is missing from its set.
+
+         `twitter:card` is the ONE deliberate exception, and it is deliberate
+         twice over. Dash writes its whole per-page set with `property=`
+         (dash/_pages.py), but the Twitter card spec is defined on `name=` —
+         so on the browser lane the card was declared in a form the spec does
+         not name, while the crawler lane (dash-improve-my-llms, which gets it
+         right) declared it properly. Two documents, two different identities.
+         Unlike title/description/image, this value is site-constant, so a
+         static copy cannot be the less accurate one: it is `summary_large_image`
+         on every page of this site or it is wrong everywhere. Hence one static
+         `name=` tag beside Dash's `property=` one, with identical content.
+
+         The pair is pinned by tests/test_social_card.py, and the reason it is
+         here at all is scripts/smoke_live.py's crawler/browser identity
+         parity block — which found the drift on the live host on 2026-08-26
+         and is the only check that could. boilerplate.2plot.dev and
+         flexlayout.2plot.dev already ship the same pair. -->
+    <meta name="twitter:card" content="summary_large_image">
     <meta name="twitter:image:alt" content="dash-emoji-mart — emoji picker for Dash">
 
     <!-- Mantine yellow, matching the brand. Must equal the manifest's
@@ -118,10 +136,29 @@
          template names.
          ======================================================================== -->
 
-    <link rel="icon" href="/assets/favicon/favicon.ico" sizes="any">
+    <!-- These four MUST declare the same rel/href/sizes triples that run.py's
+         `configure_seo(icons=[...])` declares, because that list is what the
+         crawler document's head is built from. run.py has promised for months
+         that they are "the SAME four files templates/index.html links, so the
+         browser head and the crawler head cannot drift apart" — and they had
+         drifted, in both directions, unseen until 1.6.28's parity check ran
+         against the live host:
+
+           - the .ico carried `sizes="any"` here and nothing there. `any` is
+             the scalable-icon token (it belongs on an SVG); on a raster .ico
+             it claims a property the format does not have, so the crawler
+             side was the correct one and this line moved to match it.
+           - apple-touch-icon carried no `sizes` here and `180x180` there.
+             The file IS 180x180, iOS picks by declared size, and omitting it
+             loses information — so this side was the wrong one and gained it.
+
+         Now both heads offer a consumer the same set: 180x180, 192x192,
+         512x512. tests/test_seo_icons.py pins this file against run.py's list
+         so the next drift fails offline rather than after a deploy. -->
+    <link rel="icon" type="image/x-icon" href="/assets/favicon/favicon.ico">
     <link rel="icon" type="image/png" sizes="192x192" href="/assets/favicon/favicon-192.png">
     <link rel="icon" type="image/png" sizes="512x512" href="/assets/favicon/favicon-512.png">
-    <link rel="apple-touch-icon" href="/assets/favicon/apple-touch-icon.png">
+    <link rel="apple-touch-icon" type="image/png" sizes="180x180" href="/assets/favicon/apple-touch-icon.png">
     <link rel="manifest" href="/assets/favicon/site.webmanifest">
 
     <!-- ========================================================================

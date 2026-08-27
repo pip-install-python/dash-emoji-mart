@@ -50,6 +50,52 @@ def test_discovery_agrees_with_the_declared_icons(app):
     )
 
 
+def test_the_browser_head_declares_the_same_icons_as_the_crawler_head(app):
+    """The third side of the icon triangle, and the one nothing was checking.
+
+    `test_discovery_agrees_with_the_declared_icons` above pins run.py's list
+    against what dimll discovers on disk. run.py's list is also what builds
+    the CRAWLER document's head. Nothing pinned it against the BROWSER
+    document's head — the `<link rel="icon">` tags in templates/index.html —
+    even though run.py's own comment promises they are "the SAME four files
+    templates/index.html links, so the browser head and the crawler head
+    cannot drift apart".
+
+    They had drifted, both ways: the .ico declared `sizes="any"` here and
+    nothing there, apple-touch-icon declared `180x180` there and nothing here.
+    Neither is visible from inside the app — every offline test read one side
+    or the other, never the pair — and it took `scripts/smoke_live.py`'s
+    crawler/browser identity parity block, running against production on
+    2026-08-26, to see it. This is the same assertion moved offline, so the
+    next drift costs a test run instead of a red deploy.
+
+    Compared as (rel, href, sizes) triples, unordered: emission order differs
+    between the two heads by design, and Dash injects an extra cache-busting
+    favicon link into the browser head that belongs to neither list.
+    """
+    from dash_improve_my_llms.seo import _config
+
+    declared = _normalize(_config.icons or [])
+    assert declared, "configure_seo(icons=) is no longer declared in run.py?"
+
+    html = (Path(__file__).resolve().parent.parent / "templates" / "index.html").read_text()
+    linked = set()
+    for tag in re.findall(r'<link[^>]+rel="(?:icon|apple-touch-icon)"[^>]*>', html):
+        rel = re.search(r'rel="([^"]+)"', tag).group(1)
+        href = re.search(r'href="([^"]+)"', tag).group(1)
+        sizes = re.search(r'sizes="([^"]+)"', tag)
+        linked.add((rel, href, sizes.group(1) if sizes else None))
+
+    assert linked == declared, (
+        "The browser head and the crawler head declare different icons.\n"
+        f"run.py only:      {sorted(declared - linked)}\n"
+        f"index.html only:  {sorted(linked - declared)}\n"
+        "Both lists describe the same files; move them together. Identity may "
+        "not differ between the two documents — content is what the prerender "
+        "is for."
+    )
+
+
 def _declared_lastmods() -> set[str]:
     dates = set()
     for md in Path("docs").glob("**/*.md"):
