@@ -98,6 +98,16 @@ class SmokeFailure(Exception):
     pass
 
 
+class SmokeSkip(Exception):
+    """Not applicable HERE, and saying so out loud beats silence.
+
+    A skip is a verdict, not an absence: it means the predicate for a check
+    is false on this host (no Dockerfile, no image lane), which is different
+    from the check passing and very different from it never having run. F4
+    reads a printed skip as a declared condition rather than as drift.
+    """
+
+
 def fetch(url: str, ua: str = UA, method: str = "GET",
           body: bytes | None = None, headers: dict | None = None,
           timeout: int = TIMEOUT, retries: int = 3):
@@ -139,6 +149,8 @@ def check(name: str, fn) -> None:
     try:
         fn()
         record(name, PASS)
+    except SmokeSkip as exc:
+        record(name, SKIP, str(exc))
     except SmokeFailure as exc:
         record(name, FAIL, str(exc))
     except Exception as exc:  # network/parse error → still a failure
@@ -159,6 +171,58 @@ def satellite_checks(base: str) -> None:
         status, _, text = get("/healthz")
         expect(status == 200, f"/healthz {status}")
         expect(json.loads(text).get("ok") is True, f"unexpected body {text[:120]!r}")
+
+    def python_matches_declared():
+        """The interpreter SERVING vs the interpreter DECLARED.
+
+        SYNC-1.6.22-1.6.29 item 5. Every other encoding of this fork's Python
+        — the Dockerfile's FROM tag, the CI matrix, render.yaml — is a
+        declaration a reader takes on trust, and they can all agree with each
+        other while the thing actually answering requests runs something else.
+        A rebuilt-image claim is exactly that shape: this repo's image moved
+        from 3.12-slim to 3.14-slim through a dependabot merge, and until
+        /healthz carried this field nothing outside the container could tell
+        whether the running container had been rebuilt on it.
+
+        The MINOR is what is compared, not the patch. `python:3.14-slim`
+        tracks 3.14.x through the registry by design — that is the whole
+        argument against a patch pin — so a patch difference is the tag
+        working, and only a minor difference is a disagreement.
+
+        A missing `python` field is a FAILURE, never a skip (1.6.28,
+        filed from this repo): absence is what the pre-adoption state looks
+        like, and reading it as "not applicable" is how the expensive half of
+        the detect stayed invisible in the first place.
+        """
+        dockerfile = os.path.join(
+            os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "Dockerfile"
+        )
+        if not os.path.isfile(dockerfile):
+            raise SmokeSkip("no Dockerfile — this fork declares no image lane")
+        declared = ""
+        with open(dockerfile, encoding="utf-8") as fh:
+            for line in fh:
+                if line.startswith("FROM python:"):
+                    declared = line.split("FROM python:", 1)[1].strip()
+                    break
+        expect(bool(declared), "Dockerfile has no `FROM python:` line to compare against")
+        declared_minor = ".".join(
+            declared.removesuffix("-slim").split(".")[:2]
+        )
+
+        status, _, text = get("/healthz")
+        expect(status == 200, f"/healthz {status}")
+        served = json.loads(text).get("python")
+        expect(served, (
+            "/healthz declares no `python` field — the host cannot say which "
+            "interpreter answered, so the image tag is an unverifiable claim"
+        ))
+        served_minor = ".".join(str(served).split(".")[:2])
+        expect(served_minor == declared_minor, (
+            f"serving Python {served} but the image declares "
+            f"python:{declared} — the running container was not built from "
+            "the tag this repo states, or the platform overrode it"
+        ))
 
     def llms_txt_identity():
         # The check this whole standard exists for. The H1 is what an agent
@@ -254,6 +318,7 @@ def satellite_checks(base: str) -> None:
 
     for name, fn in (
         ("healthz_ok", healthz_ok),
+        ("python_matches_declared", python_matches_declared),
         ("llms_txt_identity", llms_txt_identity),
         ("llms_txt_names_the_hub", llms_txt_names_the_hub),
         ("page_llms_nav", page_llms_nav),

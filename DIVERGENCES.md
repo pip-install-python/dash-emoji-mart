@@ -129,6 +129,35 @@ passing — for `dash-generate-components` output, which is what this
 repo's own component produces. `.. kwargs::` is kept for DMC;
 `.. props::` documents `DashEmojiMart`.
 
+### 9. The docs-site CI window keeps its FLOOR leg, not two adjacent minors
+
+`.github/workflows/ci.yml`, `tests/test_python_version.py`
+
+SYNC-1.6.22-1.6.29 item 5 wants the `smoke` matrix three wide around
+the fleet Python: the main leg at X.Y and two includes at X.Y-1 and
+X.Y-2. Around 3.14 that is 3.14 / 3.13 / 3.12.
+
+This repo runs 3.14 / 3.13 / **3.10**. The low leg is the docs
+site's declared FLOOR, not an adjacent minor: `python-frontmatter`
+1.3 imports `typing.TypeGuard`, so the site genuinely requires 3.10+,
+and ci.yml's header has said so since before this item existed. Under
+the template's rule that boundary would drop out of CI entirely the
+moment the fleet moved past 3.12 — a floor nothing tests is a floor
+nobody can trust, and the next dependency that quietly needs 3.11
+would be found by a user rather than a run.
+
+The rest of item 5 is adopted unchanged, including the parts that
+make this leg safe to keep: one Python per fork everywhere it is
+DECLARED, sourced from the Dockerfile's FROM tag, with the site lane
+(`smoke`, `container`, `audit`, and cd.yml's `verify`) held to it and
+the package lane — the wheel's own 3.9–3.13 `requires-python` window
+— explicitly held apart. `tests/test_python_version.py` pins the leg
+to the floor by name, so this stays a stated divergence rather than a
+leg nobody re-examined.
+
+Not a byte-owned path: `ci.yml` is not in any spec's `sync-verbatim`
+block, so the fence below is unaffected.
+
 ## Byte-owned paths
 
 Paths this fork owns byte-for-byte. The F3b fan-out never overwrites
@@ -150,6 +179,15 @@ in none of those sets. The one that did — §8, on the kit test — was
 upstreamed in 1.6.18 and is retired below, and that file's bytes now
 match the template's exactly. Fork the template's bytes on any of
 them and this block is where you say so, in the same commit.
+
+Re-audited 2026-08-26 at template 1.6.29 (5589318), after the F3b
+fan-out landed the 1.6.22-1.6.28 block here (PR #6, e0687b5). The set
+above is unchanged: `scripts/smoke_live.py` joined the block at 1.6.28
+and was pulled back out at 1.6.29 after exactly one live round, so it
+never becomes a fence question — and this fork does not own it anyway.
+Its bytes here are the template's at 5589318, verified by digest. The
+new §9 names `.github/workflows/ci.yml`, which no spec byte-copies.
+Still empty, still by audit.
 
 ```yaml byte-owned
 ```

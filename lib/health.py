@@ -3,15 +3,23 @@
 
 The 2plot.ai hub sweeps every satellite's ``/healthz`` once an hour and records
 up/down + latency — that's the "Satellite health & reach" panel on ``/traffic``
-(the traffic rollup this app POSTs supplies the other half). The FastAPI build
-already declares a typed ``/healthz`` in ``lib/asgi_routes`` so it shows up in
-Swagger; this module gives the other two backends the same endpoint, so the
-probe result doesn't depend on which backend a deployment happens to run.
+(the traffic rollup this app POSTs supplies the other half).
+
+This module serves ALL THREE backends here, FastAPI included. The donor's
+copy of this docstring says the FastAPI build "already declares a typed
+``/healthz`` in ``lib/asgi_routes``"; this repo ships no such module, which
+``register_health_route``'s fastapi branch says in as many words. Corrected
+rather than carried, because an inherited sentence that describes a file the
+tree does not have is how a session goes looking for the wrong thing — and
+because SYNC-1.6.22-1.6.29 item 5 names ``lib/asgi_routes.py`` as one of the
+two places the ``python`` field is built, which is true upstream and is one
+place here.
 
 Keep it cheap: the hub measures the round trip, so any work done here is
 reported back as this app being slow.
 """
 import os
+import platform
 
 import dash
 
@@ -86,6 +94,27 @@ def health_payload(backend: str, headers=None) -> dict:
     # "unknown" rather than this repo's key, so a missing SATELLITE_APP_KEY
     # reads as missing instead of quietly asserting an identity.
     payload["app"] = os.environ.get("SATELLITE_APP_KEY") or "unknown"
+
+    # WHICH interpreter answered. SYNC-1.6.22-1.6.29 item 5: one Python per
+    # fork, everywhere it is encoded — and every other encoding is a
+    # DECLARATION (the Dockerfile's FROM tag, the CI matrix, render.yaml)
+    # that a reader takes on trust. This is the only one measured from the
+    # running process, so it is the only one that can contradict the rest.
+    #
+    # This repo is the reason the spec says a MISSING field counts as
+    # not-adopted rather than not-applicable (1.6.28): dependabot moved the
+    # image from 3.12-slim to 3.14-slim on its own, so `grep ^FROM Dockerfile`
+    # — the cheap half of the detect — passed while nothing on the wire could
+    # confirm the container had actually been rebuilt on it. Absence is not
+    # neutral here; it is the half of the detect that was failing invisibly.
+    #
+    # Unconditional, unlike `build`: there is no environment in which a
+    # running Python cannot say which Python it is, so an absent field means
+    # a stale artifact rather than a platform that declined to set something.
+    # scripts/network_smoke.py's `python_matches_declared` reads it back
+    # against the Dockerfile, and tests/test_python_version.py holds the
+    # declarations to each other.
+    payload["python"] = platform.python_version()
 
     # The geo guardrail's LIVE state (dash-improve-my-llms >= 2.7.0). Added
     # after a sibling host's production verification could not answer "is the
