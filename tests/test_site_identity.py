@@ -160,7 +160,12 @@ def test_llms_package_floor_is_the_network_standard():
     The ladder EXTENDS rather than rewrites — each rung is why the floor
     could not go back below it:
 
-      * 2.7.1 is the floor. Below 2.7.0 every page serves a duplicate H1
+      * 2.8.0 is the floor. Below it `classify()` and `on_document_read`
+        do not exist: lib/analytics_tracker cannot delegate its bot
+        classification (its own list filed ClaudeBot, Anthropic's
+        TRAINING crawler, as *search*) and no read row is ever kept, so
+        the ledger's `reads` table and rollup v4's `vendors[]` stay empty.
+      * 2.7.1 was the previous floor. Below 2.7.0 every page serves a duplicate H1
         to crawlers; 2.7.0 also carries the geo guardrail lib/health.py
         reports, which is the wire-side tell for the Docker cache trap.
       * 2.6.1 stopped shipping the prerender block with a literal
@@ -173,8 +178,8 @@ def test_llms_package_floor_is_the_network_standard():
     import dash_improve_my_llms as pkg
 
     parts = tuple(int(p) for p in pkg.__version__.split(".")[:3] if p.isdigit())
-    assert parts >= (2, 7, 1), (
-        f"dash-improve-my-llms {pkg.__version__} is below the 2.7.1 floor — "
+    assert parts >= (2, 8, 0), (
+        f"dash-improve-my-llms {pkg.__version__} is below the 2.8.0 floor — "
         "the same number requirements.txt, run.py's _DIMLL_FLOOR and both "
         "ci.yml asserts state. Every encoding moves together or the ones "
         "left behind stop guarding silently; see this test's docstring for "
@@ -185,7 +190,7 @@ def test_llms_package_floor_is_the_network_standard():
 def test_the_requirements_floor_matches():
     """The installed version proves nothing about what CI or Render installs."""
     reqs = (REPO_ROOT / "requirements.txt").read_text()
-    assert "dash-improve-my-llms[flask]>=2.7.1" in reqs
+    assert "dash-improve-my-llms[flask]>=2.8.0" in reqs
 
 
 # ---------------------------------------------------------------------------

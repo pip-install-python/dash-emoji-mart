@@ -67,6 +67,7 @@ from dash_improve_my_llms import (
     LLMSConfig,
     RobotsConfig,
     add_llms_routes,
+    on_document_read,
     register_page_metadata,
 )
 
@@ -115,6 +116,19 @@ from lib.constants import (
 # /llms-full.txt) that the LLMS_SMALL_TIER / LLMS_FULL_TIER knobs govern.
 # Below it the tier registrations further down are dead code and nothing says so.
 #
+#   * 2.8.0 is the ledger floor (2026-08-29). ONE classifier: `classify()`
+#     is the registry robots.txt is rendered from, and lib/analytics_tracker
+#     delegates to it instead of carrying a fourth User-Agent list — the one
+#     it carried for a year filed ClaudeBot as *search* when it is Anthropic's
+#     TRAINING crawler, six lines from where this file's own comments say so,
+#     and counted every UA-less or library client as a person. The READ
+#     EVENT: `on_document_read` hands this app one row per corpus document
+#     the package served (tier, verdict, bytes, verified vendor), which the
+#     tracker keeps as the ledger's `reads` table and lib/traffic_rollup
+#     folds into rollup v4's `vendors[]`. Below it neither name exists, so
+#     the ledger's second table stays empty and nothing says so.
+#     2.8.1 will write the resolved `policy` on every event; until then it is
+#     None and the rollup groups it as "default". Nothing here waits on it.
 #   * 2.7.1 adds the llms.txt v2 discovery relations (rel=alternate /
 #     describedby, plus the matching Link headers), the text/plain Accept
 #     ramp, and the representation digest — the machine lane's addressing
@@ -139,7 +153,7 @@ from lib.constants import (
 #     declares configure_seo(icons=) explicitly; tests/test_seo_icons.py pins
 #     that the two sets agree) and the JSON-LD publisher logo.
 # ----------------------------------------------------------------------------
-_DIMLL_FLOOR = (2, 7, 1)
+_DIMLL_FLOOR = (2, 8, 0)
 
 
 def _check_dimll_version() -> str:
@@ -160,6 +174,10 @@ def _check_dimll_version() -> str:
         raise RuntimeError(
             f"dash-improve-my-llms {raw} is installed, but this site needs "
             f">= {floor}.\n"
+            f"  Below 2.8.0 there is no `classify()` and no "
+            f"`on_document_read`: the tracker cannot delegate bot "
+            f"classification and no read row is ever kept, so the ledger's "
+            f"`reads` table and rollup v4's vendors[] stay empty.\n"
             f"  Below 2.7.1 the llms.txt v2 discovery relations "
             f"(rel=alternate/describedby + Link headers), the text/plain "
             f"Accept ramp and the representation digest are missing.\n"
@@ -493,6 +511,17 @@ ACCESS_ENABLED = _access.configure(
 # stub body, which is the to-do list. Silencing it hides the list rather than
 # clearing it — mark_hidden() anything genuinely internal instead.
 add_llms_routes(app, LLMSConfig(warn_missing_llms_doc=True))
+
+# The ledger row (dimll 2.8.0): the package emits one event per corpus
+# document it serves and does no I/O with it; lib/analytics_tracker keeps it
+# as the `reads` table next to `visits`, same buffer, lock and retention.
+# Registered ONCE — the test suite imports run.py more than once per process
+# and `on_document_read` APPENDS, so a marker on the callback's owner guards
+# the second import (the package also dedups an identical callable; belt and
+# braces).
+if not getattr(tracker, "_read_hook_registered", False):
+    on_document_read(tracker.record_read)
+    tracker._read_hook_registered = True
 
 # The FastAPI mirror of the tracking hook above — see the ordering note there.
 if BACKEND == "fastapi":

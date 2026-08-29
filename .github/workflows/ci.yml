@@ -129,19 +129,22 @@ jobs:
               f"gunicorn {gunicorn_v} is under the CVE floor — markdown2dash's "
               "spurious <22 pin won"
           )
-          # The floor lives in FOUR encodings — requirements.txt, run.py's
+          # The floor lives in FIVE encodings — requirements.txt, run.py's
           # boot tuple + message, the tests, and these asserts — and the
           # 2026-08-23 floor round moved the first three and left these two
           # at 2.6.0. Nothing broke (production was verifiably on 2.7.1),
           # which is the point: a guard a release outgrows stops guarding
           # silently. Moving every encoding at once is the rule.
-          assert parts(dimll_v) >= (2, 7, 1), (
-              f"dash-improve-my-llms {dimll_v} is below the 2.7.1 floor — "
-              "below 2.6.0 `lastmod=` is swallowed and the sitemap invents "
-              "build dates; below 2.7.0 the prerender serves a duplicate H1 "
-              "and the home footer doubles its /llms.txt link; below 2.7.1 "
-              "there are no llms.txt v2 discovery relations, no Link "
-              "headers, and no representation digest"
+          assert parts(dimll_v) >= (2, 8, 0), (
+              f"dash-improve-my-llms {dimll_v} is below the 2.8.0 floor — "
+              "below 2.8.0 there is no `classify()` and no "
+              "`on_document_read`, so the tracker keeps its own stale UA "
+              "list and the ledger's `reads` table is never written; "
+              "below 2.7.1 there are no llms.txt v2 discovery relations, "
+              "no Link headers and no representation digest; below 2.7.0 "
+              "the prerender serves a duplicate H1 and the home footer "
+              "doubles its /llms.txt link; below 2.6.0 `lastmod=` is "
+              "swallowed and the sitemap invents build dates"
           )
           # The 1.0.1 advisory work: clerk-backend-api 5.x capped cryptography
           # at <47, below the fixes for GHSA-537c-gmf6-5ccf, PYSEC-2026-3553/
@@ -455,8 +458,8 @@ jobs:
           # `>=` floor can never pull a newer release through a cache hit, so
           # an image built before the requirements line moved would carry the
           # old package while every text encoding claimed the new one.
-          assert parts(dimll_v) >= (2, 7, 1), (
-              f"image has dash-improve-my-llms {dimll_v}, below the 2.7.1 "
+          assert parts(dimll_v) >= (2, 8, 0), (
+              f"image has dash-improve-my-llms {dimll_v}, below the 2.8.0 "
               "floor — either requirements.txt did not move or this image is "
               "a dependency-layer cache hit predating the bump"
           )

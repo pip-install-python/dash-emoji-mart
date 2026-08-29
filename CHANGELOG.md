@@ -5,6 +5,64 @@ All notable changes to this project are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased] — the docs site
+
+Nothing here changes `pip install dash-emoji-mart`; this is the site.
+Consumed template SYNC-1.6.22-1.6.35 items 12 and 13 (template `4c63992`).
+
+### Changed
+
+- **`human_hits` DROPS and `bot_hits` RISES from the day this deploys, and
+  that is the number becoming true, not a regression.** `lib/analytics_tracker`
+  carried its own User-Agent lists for a year. They filed ClaudeBot —
+  Anthropic's *training* crawler — under "search"; they still named the
+  retired `anthropic-ai` / `claude-web` tokens; and they counted every UA-less
+  or library client (`httpx`, `Go-http-client`, `node-fetch`, an empty
+  User-Agent) as a desktop human. Those clients now land on the crawler lane,
+  where they always belonged. Expect a visible step in the hub's day-over-day
+  view for this app on the adoption date; nothing before it was re-scored.
+- **There is ONE classifier: `dash_improve_my_llms.classify()`.** `is_bot` and
+  `detect_bot_type` keep their names and signatures for callers and delegate;
+  the module ends with zero User-Agent strings, and
+  `tests/test_analytics_classifier.py` greps it for the old tokens. A token the
+  package's registry lacks is a pushback to the package, never a list here.
+- **The dash-improve-my-llms floor moves 2.7.1 → 2.8.0**, in all five
+  encodings (`requirements.txt`, `run.py`'s `_DIMLL_FLOOR` and its boot
+  diagnosis, `tests/test_site_identity.py`, and both `ci.yml` asserts).
+- **Render deploys `release`, and only CD writes `release`.** A push to `main`
+  is a candidate, not a deploy: `cd.yml`'s `deploy` job fast-forward-pushes the
+  run's own sha to `release` after the CI matrix is green, and Render's
+  autoDeploy reacts to that branch. `main` ahead of `release` means an
+  uncertified push is pending. `verify` now runs only on a *successful* deploy
+  and asserts `/healthz build == github.sha` itself — the old
+  `always() && != 'cancelled' && != 'skipped'` admitted `failure`, and a verify
+  that passes when nothing deployed must not exist.
+
+### Added
+
+- **The ledger's second table, `reads`.** dash-improve-my-llms 2.8.0 emits one
+  event per corpus document it serves (`on_document_read`); `run.py` registers
+  it once into `AnalyticsTracker.record_read`, which keeps every
+  `_ledger.EVENT_FIELDS` key in a `reads` list in the same analytics file —
+  same buffer, lock, flush cadence and retention as `visits`, with `client_ip`
+  dropped unless `ANALYTICS_KEEP_CLIENT_IP=1`. It is a second table JOINED by
+  the rollup, never summed into `human_hits` / `bot_hits` / `pages`.
+- **Rollup v4, additive.** On a day with reads the payload gains
+  `vendors[{key, class, verified, policy, hits, bytes, tiers{…}}]` (one row per
+  `(key, verified, policy)`, the null key kept as the unverifiable bulk, capped
+  at 40) and `reads` = `sum(vendors[].hits)`. Every v3 key is byte-identical,
+  and a reads-only day is reported.
+- **`/admin/traffic`** (`pages/traffic.py`) — this host's own ledger behind the
+  control board's exact gate, failing closed without Clerk: vendor × day,
+  vendor → tier for the picked day, top paths per vendor, and the v3 headline
+  numbers alongside. Plain tables, no charts, no interval callback. `verified`
+  is `n/a` where the operator publishes no IP ranges — Anthropic publishes
+  none, so ClaudeBot is *always* `n/a` here, and that is a property of the
+  vendor, not a defect on this host.
+- **A declared posture fence** in `DIVERGENCES.md`, measured on the wire
+  2026-08-29: `ai_bots {"/": 403, "/llms.txt": 200, "/healthz": 403}`,
+  `healthz: full`, `runtime: docker`, `deploy: release-branch`.
+
 ## [0.2.1] — 2026-08-01
 
 Two things: a picker bug that made whole custom categories invisible, and this

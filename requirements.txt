@@ -82,7 +82,9 @@ python-frontmatter
 # govern. Below it the tier wiring in run.py is dead code and nothing says so;
 # run.py enforces this same floor at boot for exactly that reason.
 #
-# 2.7.1 is the floor. It buys the machine lane's addressing layer — the
+# 2.8.0 is the floor; see the block above this line for what it buys.
+#
+# 2.7.1 remains beneath it. It bought the machine lane's addressing layer — the
 # llms.txt v2 discovery relations (rel=alternate / describedby, with matching
 # Link headers), the text/plain Accept ramp and the representation digest —
 # on top of 2.7.0, which dedups what the prerender injects: below 2.7.0 every
@@ -118,7 +120,24 @@ python-frontmatter
 # It also adds icon autodiscovery (this site still declares configure_seo(
 # icons=[...]) explicitly — declared wins, and tests/test_seo_icons.py pins
 # that the two sets agree) and the JSON-LD publisher logo.
-dash-improve-my-llms[flask]>=2.7.1
+# 2.8.0 floor (the ledger round, 2026-08-29) — WHY 2.8: (1) ONE
+# CLASSIFIER: `classify()` is public and it is the same registry
+# robots.txt is rendered from; lib/analytics_tracker delegates to it and
+# carries no User-Agent list of its own any more (its list filed ClaudeBot
+# as "search" — it is Anthropic's TRAINING crawler — and counted every
+# UA-less or library client as a person). (2) THE READ EVENT:
+# `on_document_read` hands the app one row per corpus document served —
+# tier, lane, vendor, verified, policy, verdict, status, bytes — which
+# run.py registers into the tracker's `reads` table. (3) `Vary: User-Agent`
+# on the lane-split responses. (4) VERIFIED IDENTITY: vendors with
+# published IP ranges are checked against them (`verified`/`unverified`;
+# `n/a` where none are published — Anthropic publishes none, so ClaudeBot
+# is always n/a). 2.8.1 (policy on every event) is NOT waited on: `policy`
+# is None until then and the rollup groups it as "default".
+# run.py's `_DIMLL_FLOOR` encodes the same number — grep it, don't move
+# one. And the CACHE TRAP: this line changing IS the Docker cache bust; a
+# `>=` floor can never pull a new release through a cache hit.
+dash-improve-my-llms[flask]>=2.8.0
 python-dotenv>=1.0
 pydantic>=2.0
 requests>=2.31
