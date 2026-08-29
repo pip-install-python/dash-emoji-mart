@@ -20,6 +20,42 @@ template's file); clerkhook's minimal `{ok, app, build}` healthz and
 its heartbeat-as-before_request (the single anonymous 200 on a locked
 host); muischeduler's no-npm dependabot scope.
 
+## Declared posture
+
+What this host actually serves, homed in the repo that serves it
+rather than in a table on the hub that ages out of sight. Nothing
+validates the numbers but a probe — re-measure when you change what
+this host serves. `tests/test_claude_kit.py` validates the SHAPE only.
+
+    ai_bots   the status an AI-crawler UA receives per path, measured
+              with a real vendor UA (ClaudeBot here — NOT a UA-less
+              curl, which is classified separately). The asymmetry IS
+              the posture: the browser document is refused while the
+              agent surfaces stay open, and it is invisible from a
+              browser.
+    healthz   `full` — the fleet payload (app, backend, build,
+              dash_version, geo, ok, python). Not `minimal`; this host
+              has no lockdown divergence.
+    runtime   `docker` — render.yaml's service runtime, which is why
+              PYTHON_VERSION is deliberately ABSENT there (sync item 5).
+    deploy    `release-branch` — Render deploys `release`, which only
+              CD writes after a green matrix (template 1.6.35, sync
+              item 13). `build` on /healthz is HEAD of `release`, and
+              `main` ahead of it is an uncertified push PENDING — never
+              drift, never a reason to deploy by hand. ABSENT would
+              read as `main`.
+
+Measured on emojimart.2plot.dev, 2026-08-29, build 53bc5e8 — the
+ai_bots row with `-A ClaudeBot/1.0`, the healthz row from the live
+payload, the runtime and deploy rows from render.yaml in this commit.
+
+```yaml posture
+ai_bots: {"/": 403, "/llms.txt": 200, "/healthz": 403}
+healthz: full
+runtime: docker
+deploy: release-branch
+```
+
 ## This repo's divergences
 
 ### 1. `.. source::` expansion is line-walked, and consumes the directive's options
