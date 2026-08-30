@@ -333,6 +333,8 @@ def resources() -> list:
 # drawer's offset is computed from this, so a header that grew without this
 # constant growing leaves a strip of page visible above the drawer.
 # Change it here only; the two must never drift apart.
+
+
 HEADER_HEIGHT = 70
 
 

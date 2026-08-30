@@ -49,6 +49,26 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 os.chdir(PROJECT_ROOT)
 
+# THE LANE THIS HARNESS ASKS IN. The fourth request-sending tool in this repo
+# to need this, and the rule is now general: at dash-improve-my-llms >= 2.8 a
+# request with no browser engine token — including one with NO User-Agent at
+# all, which is what a bare test client sends — is classified CRAWLER lane.
+# Every check below that expects a page to answer 200 has to say it is a
+# browser, or a correctly-hidden admin page reads as broken routing (leaflet's
+# first CD run under the 2.8 floor, 2026-08-30). The internal token stays in
+# the string so nothing here can ever be counted as real traffic; CRAWLER_UA
+# is the other lane, used deliberately where the crawler answer IS the check.
+try:
+    from lib.constants import INTERNAL_UA as _INTERNAL_UA
+except Exception:  # pragma: no cover — running outside a repo checkout
+    _INTERNAL_UA = "2plot-internal/1.0 (+https://2plot.ai/docs/satellite-analytics)"
+BROWSER_UA = (
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 "
+    "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36 "
+    + _INTERNAL_UA + " smoke-test"
+)
+CRAWLER_UA = "Mozilla/5.0 (compatible; Googlebot/2.1) " + _INTERNAL_UA
+
 # Flask's test client is the only backend whose in-process client needs no extra
 # dependency, and every check here is backend-independent.
 os.environ.setdefault("DASH_BACKEND", "flask")
@@ -238,9 +258,10 @@ def _http_checks(res: Results, run_mod, dash_mod) -> None:
         return
     res.add("http", "test client available", True, type(server).__name__)
 
-    def get(url: str, group: str, expect=(200,), label: str | None = None):
+    def get(url: str, group: str, expect=(200,), label: str | None = None,
+            user_agent: str = BROWSER_UA):
         try:
-            resp = client.get(url)
+            resp = client.get(url, headers={"User-Agent": user_agent})
             ok = resp.status_code in expect
             res.add(group, label or url, ok, f"HTTP {resp.status_code}")
             return resp
@@ -260,8 +281,25 @@ def _http_checks(res: Results, run_mod, dash_mod) -> None:
 
     # Every page path. A Dash SPA returns the same index HTML for all of them,
     # so a non-200 means routing or the index template broke.
+    #
+    # ON THE BROWSER LANE, and that is the whole point of `get`'s default UA
+    # (leaflet's first CD run, 2026-08-30). The admin pages are `mark_hidden`,
+    # so on the CRAWLER lane they answer 404 BY DESIGN — and a bare test
+    # client sends no User-Agent, which at dash-improve-my-llms >= 2.8 IS the
+    # crawler lane. This loop then read a working, correctly-hidden page as
+    # broken routing. A browser gets the page (and its gate card); a crawler
+    # gets nothing. Both are right; the harness has to say which one it asked.
     for entry in dash_mod.page_registry.values():
         get(entry["path"], "routes")
+
+    # And the other half, asserted rather than assumed: the hidden pages must
+    # 404 on the crawler lane. Without this the fix above would simply stop
+    # measuring the thing that was accidentally being measured before.
+    for entry in dash_mod.page_registry.values():
+        path = entry["path"] or ""
+        if path.startswith("/admin/"):
+            get(path, "hidden", expect=(404,), user_agent=CRAWLER_UA,
+                label=f"{path} is 404 to crawlers")
 
 
 def _check_callbacks(res: Results, run_mod) -> None:

@@ -324,6 +324,7 @@ clientside_callback(
     State("desktop-navbar-collapsed", "data"),
 )
 
+
 @callback(
     Output("m2d-appshell", "aside"),
     Input("url", "pathname"),
