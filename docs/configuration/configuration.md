@@ -4,6 +4,7 @@ description: "Every layout, sizing and locale prop, wired to live controls so yo
 endpoint: "/configuration"
 package: dash-emoji-mart
 category: "Configuration"
+order: 10
 icon: "tabler:adjustments"
 lastmod: 2026-08-01
 ---

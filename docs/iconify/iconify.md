@@ -4,6 +4,7 @@ description: "Turn any of Iconify's 150+ icon sets — twemoji, OpenMoji, Fluent
 endpoint: "/iconify"
 package: dash-emoji-mart
 category: "Custom emojis"
+order: 20
 icon: "simple-icons:iconify"
 lastmod: 2026-08-02
 ---

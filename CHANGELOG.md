@@ -8,7 +8,65 @@ this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 ## [Unreleased] — the docs site
 
 Nothing here changes `pip install dash-emoji-mart`; this is the site.
-Consumed template SYNC-1.6.22-1.6.35 items 12 and 13 (template `4c63992`).
+Consumed template SYNC-1.6.22-1.6.35 items 12 and 13 (template `4c63992`)
+and SYNC-1.6.22-1.6.38 items 15 and 16 (template `519d496`).
+
+### Added — navigation
+
+- **`/changelog`** — this file as a Timeline, and its own `LLMS_DOC`. Linked
+  once, from the top of the sidebar.
+- **`/api`** — a generated prop table per exported component, read from
+  `dash_emoji_mart`'s `metadata.json` (Dash 4's generated classes carry no
+  `_prop_names`). 34 props on `DashEmojiMart`. The same tables are the page's
+  `LLMS_DOC`.
+- **A footer** — © the computed year, the GitHub *profile*, the 2plot Discord
+  and the YouTube subscribe link. Every icon has an accessible name.
+- **An *Other Apps* menu** in the top bar, built from
+  `lib/network_directory`'s `PRIMARY` set with this host removed: 2plot.ai,
+  2plot.dev, 2plot.media, piratesbargain.com, ai-agent.buzz. It is the only
+  place the network is listed now.
+- **A backend badge and a version badge** in the top bar (`v0.2.1`, read from
+  the documented package).
+- **An Admin section** in the sidebar, filled by a callback and empty for
+  everyone else. `/admin/control-board` and `/admin/traffic` used to sit in a
+  public "Other" bucket, shown to every visitor and correctly refused — the
+  startup tree now carries no `/admin/` href at all, and neither does search.
+
+### Changed — navigation
+
+- **The sidebar is built from frontmatter.** Every docs page declares
+  `category:` and `order:`; `components/navbar.py` holds no fork content and
+  no page list. Section order comes from `CATEGORY_ORDER` in
+  `lib/constants.py`: Start here · Configuration · Custom emojis · Dash
+  integration — the names this site already used.
+- **Resources is third-party only**: `dmc`, emoji-mart and Iconify sets. The
+  GitHub, Discord and "Dash Community" links are gone from it — the repo is
+  the top bar's icon and the community links are the footer's, and each was
+  being listed twice. The Discord link now points at the 2plot server; it
+  pointed at a different one.
+- **`.. source::` code blocks name their copy button** (`copyLabel` /
+  `copiedLabel`), the Burger and the home link have accessible names, and
+  headings containing inline code no longer take the page down at import.
+- **Code blocks, prop tables and inline code stay inside the viewport** at
+  phone width. `.. props::` tables were never matched by the rule that
+  claimed to cover them.
+- **`/admin/traffic`**: the day picker is a `dmc.DatePickerInput` with
+  presets, not a `dcc.Dropdown`, and the human numbers have their own
+  **People** section above the crawler tables — humans never enter the read
+  ledger, so "(unidentified)" below is the UA-less crawler lane, never a
+  person.
+- **The right-hand TOC column collapses** on pages that render no `.. toc::`.
+
+### Changed — crawler posture
+
+- **The AI-training wall is retired.** `robots.txt` no longer Disallows
+  GPTBot / ClaudeBot / CCBot and the package stops answering 403 to them on
+  the browser document and `/healthz`. The wall decided by vendor *class*
+  what nobody could account for; every corpus read is now a ledger row with
+  tier, vendor, verification and bytes, so the tool from here is per-vendor
+  policy for one vendor whose rows justify it. Measured in-process: both UAs
+  get 200 on `/`, `/llms.txt` and `/healthz`, and `robots.txt` carries no
+  `Disallow` at all.
 
 ### Changed
 

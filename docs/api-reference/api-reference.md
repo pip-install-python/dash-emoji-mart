@@ -4,6 +4,7 @@ description: "Every prop on DashEmojiMart, generated from the component itself."
 endpoint: "/api-reference"
 package: dash-emoji-mart
 category: "Start here"
+order: 20
 icon: "tabler:list-details"
 lastmod: 2026-08-01
 ---

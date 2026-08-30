@@ -29,4 +29,12 @@ class SC(SourceCode):
                     "icon": mapping[extension]["icon"],
                 }
             )
-        return dmc.CodeHighlightTabs(code=code, defaultExpanded=defaultExpanded=="true", withExpandButton=withExpandedButton=='true')
+        return dmc.CodeHighlightTabs(
+            code=code,
+            defaultExpanded=defaultExpanded == "true",
+            withExpandButton=withExpandedButton == "true",
+            # The copy button is icon-only; without these it has no accessible
+            # name at all (the audit's "copy button without text").
+            copyLabel="Copy code",
+            copiedLabel="Copied",
+        )

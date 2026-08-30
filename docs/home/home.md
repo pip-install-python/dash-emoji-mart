@@ -4,6 +4,7 @@ description: "An emoji picker for Dash 4 — emoji-mart wrapped as a single comp
 endpoint: "/"
 package: dash-emoji-mart
 category: "Start here"
+order: 0
 icon: "tabler:home"
 ---
 

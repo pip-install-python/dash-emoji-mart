@@ -205,6 +205,79 @@ leg nobody re-examined.
 Not a byte-owned path: `ci.yml` is not in any spec's `sync-verbatim`
 block, so the fence below is unaffected.
 
+### 10. Resources declares TWO upstreams, not one
+
+`lib/constants.py` — `UPSTREAM`, `UPSTREAM_SECONDARY`, `resources()`
+
+SYNC-1.6.22-1.6.38 item 16 contract (5) gives a fork ONE `UPSTREAM =
+{"name", "url"}` and renders it as the last Resources link. This
+component has two genuine upstreams: **emoji-mart**, which it wraps,
+and **Iconify**, whose sets `dash_emoji_mart.iconify` and the whole
+`/iconify` page are built on. A reader looking at an Iconify icon name
+has nowhere else to go for what the names mean.
+
+Both are third-party, which is the actual rule the section enforces,
+and the drop that ported item 16 here allowed a declared second
+upstream explicitly. `resources()` iterates the two rather than naming
+one, so a fork with a single upstream gets the template's behaviour by
+leaving `UPSTREAM_SECONDARY = None`.
+
+**A sync must not collapse these back to one** without deciding which
+of the two upstreams this site stops citing.
+
+### 11. `SAME_AS` keeps its PyPI vertex
+
+`lib/constants.py`
+
+Item 16 wants `SAME_AS = [GITHUB_URL]` so the repo URL is written once.
+The single-source half is adopted — the GitHub entry IS `GITHUB_URL`,
+not a second copy of the string — but the list keeps
+`https://pypi.org/project/dash-emoji-mart/` beside it. This fork
+documents a PUBLISHED package: docs ↔ repo ↔ PyPI pointing at each
+other is the strongest statement of which origin is the package's
+canonical docs home, and the template has no package to make that
+statement about.
+
+### 12. Two nav-contract test assertions are inverted here, and one is corrected
+
+`tests/test_nav_contract.py`
+
+Copied from the template at 1.6.39, with three adaptations recorded
+because two of them are FORK STATE and one is a defect in the
+template's own copy:
+
+- `test_resources_are_third_party_only` upstream bans the substring
+  `"github.com"` in a Resources URL. That passes only where `UPSTREAM`
+  is None, as it is on the template. Every component fork in the fleet
+  wraps a project hosted on GitHub — emoji-mart here; Leaflet, React
+  Flow, FlexLayout, Excalidraw, model-viewer and Pannellum elsewhere —
+  so the ban forbids the single link item 16 exists to add. This copy
+  bans the OWNER's links by value (repo, profile, Discord, YouTube,
+  `pip-install-python`, `2plot`) plus the two named removals, which is
+  what the requirement actually says. **Filed upstream as a spec
+  correction, not a local workaround.**
+- `test_api_page_is_not_registered_when_no_package_is_declared` asserts
+  `API_PACKAGES == []` ("the template documents no component package").
+  This fork documents `dash_emoji_mart`, so the same contract line is
+  tested from its other side —
+  `test_the_api_page_is_registered_for_this_fork` — asserting `/api` is
+  registered and carries `DashEmojiMart`'s props.
+- the aside and sitemap positive controls name the template's
+  endpoints (`/backend-comparison`, `/getting-started`); this copy
+  names `/configuration` and `/custom-emojis`.
+
+### 13. The wide-content CSS carries a `.m2d-block-props` selector
+
+`assets/main.css`
+
+Template 1.6.39 widened `table.m2d-table` to `table.m2d-block-kwargs`
+after measuring that `.. kwargs::` tables were never matched by the
+original rule. Measured the same way here, this repo's own `..
+props::` directive (§7) stamps `m2d-block-props` on the wrapping Box —
+not on the table — so it needs a selector of its own, which has no
+counterpart upstream because the directive has none. The comment above
+the rule previously CLAIMED it covered both; it never did.
+
 ## Byte-owned paths
 
 Paths this fork owns byte-for-byte. The F3b fan-out never overwrites

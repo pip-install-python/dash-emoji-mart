@@ -231,10 +231,102 @@ OG_IMAGE_ALT = SITE_BRAND
 # project_urls and the GitHub README pointing back at emojimart.2plot.dev) is
 # a release checklist item, not something this file can enforce.
 PUBLISHER = "Pip Install Python LLC"
+
+# ONE constant for the repository (nav contract, template 1.6.38). The
+# header's GitHub icon, JSON-LD `sameAs` and anything else that names the
+# repo read THIS — a fork sets it once. muischeduler's icon pointed at the
+# profile while its sameAs named the repo: two truths, one of them wrong.
+GITHUB_URL = "https://github.com/pip-install-python/dash-emoji-mart"
+
+# The owner's PROFILE — the footer's GitHub link. The repo is the top bar's
+# icon; the two are deliberately different targets.
+GITHUB_PROFILE_URL = "https://github.com/pip-install-python"
+
+# DIVERGENCE from the template's `SAME_AS = [GITHUB_URL]`: this fork
+# documents a PUBLISHED package, so its sameAs loop has a third vertex —
+# the PyPI project. Three URLs pointing at each other is the strongest
+# available statement of which origin is this package's canonical docs
+# home. The GitHub entry is sourced from GITHUB_URL so there is still
+# exactly one place the repo URL is written.
 SAME_AS = [
-    "https://github.com/pip-install-python/dash-emoji-mart",
+    GITHUB_URL,
     "https://pypi.org/project/dash-emoji-mart/",
 ]
+
+# ---------------------------------------------------------------------------
+# Navigation contract (template 1.6.38) — the parts of the sidebar and top
+# bar that are IDENTICAL on every host come from template code and these
+# constants; this app's own sections come from its docs' frontmatter. A fork
+# edits THIS block and `category:` / `order:` in docs/, never
+# components/navbar.py.
+# ---------------------------------------------------------------------------
+
+# This app's own sections, in sidebar order. Every docs page declares
+# `category:`; a category not listed here follows the listed ones,
+# alphabetically, and an uncategorised page falls into one trailing
+# "Documentation" section. These four names are this fork's identity and
+# predate the contract — they moved here from components/navbar.py, which
+# now holds no fork content at all.
+CATEGORY_ORDER = [
+    "Start here",
+    "Configuration",
+    "Custom emojis",
+    "Dash integration",
+]
+
+# Network-wide community links — identical on every host, and NOT the ones
+# this site used to carry. The Discord here is the 2plot server; this repo
+# previously linked a different server in the sidebar, and the sidebar no
+# longer carries community links at all (they are the footer's).
+DISCORD_URL = "https://discord.gg/e5s5uHWUHH"
+YOUTUBE_URL = "https://www.youtube.com/@2plotai"
+YOUTUBE_SUBSCRIBE_URL = YOUTUBE_URL + "?sub_confirmation=1"
+DMC_URL = "https://www.dash-mantine-components.com/"
+
+# The upstream project this component wraps. The template's shape is ONE
+# `{"name", "url"}` dict; this fork declares TWO — see `resources()` below
+# for why, and DIVERGENCES.md for the record.
+UPSTREAM = {
+    "name": "emoji-mart",
+    "url": "https://github.com/missive/emoji-mart",
+    "icon": "tabler:mood-smile",
+}
+
+# The SECOND upstream, and this fork's one departure from the contract's
+# single-UPSTREAM shape. `dash_emoji_mart.iconify` and the whole /iconify
+# page are built on Iconify's sets — a reader who wants to know where an
+# icon name comes from has nowhere else to go, and the drop that ported
+# this item allowed a declared second upstream explicitly. Same rule as
+# the first: third-party only.
+UPSTREAM_SECONDARY = {
+    "name": "Iconify sets",
+    "url": "https://icon-sets.iconify.design/",
+    "icon": "simple-icons:iconify",
+}
+
+# Dash component packages whose props the generated /api page documents.
+# Empty would mean /api is not registered; the header's version badge reads
+# the first entry's version.
+API_PACKAGES: list = ["dash_emoji_mart"]
+
+
+def resources() -> list:
+    """The sidebar's Resources section: THIRD-PARTY ONLY.
+
+    `dmc` plus the upstream projects this component is built on. The
+    owner's own links live in the top bar (the repo) and the footer
+    (profile, Discord, YouTube) and never here; no community.plotly.com,
+    and no 2plot.dev — the network is listed once, in the Other Apps menu.
+    Removing those four from this section is the point of the item, not a
+    side effect: they were each listed twice on this site.
+    """
+    items = [{"label": "dmc", "url": DMC_URL,
+              "icon": "ic:baseline-design-services"}]
+    for upstream in (UPSTREAM, UPSTREAM_SECONDARY):
+        if upstream:
+            items.append({"label": upstream["name"], "url": upstream["url"],
+                          "icon": upstream.get("icon", "mdi:open-in-new")})
+    return items
 
 # Height of the fixed AppShell header, in px. Consumed by AppShell(header=...)
 # and by the mobile drawer, which docks itself directly below the header — the
@@ -243,10 +335,6 @@ SAME_AS = [
 # Change it here only; the two must never drift apart.
 HEADER_HEIGHT = 70
 
-# 2plot network links, surfaced in the README and the docs header/navbar.
-GITHUB_URL = "https://github.com/pip-install-python/dash-emoji-mart"
-DISCORD_URL = "https://discord.gg/WEnZR35mrK"
-YOUTUBE_URL = "https://www.youtube.com/channel/UC6Bmo0t0ZUpU_xKBYW0bJuQ"
 
 # Populated by pages/markdown.py as it loads each documentation file; the
 # "copy for LLMs" button reads the raw markdown back out of it.

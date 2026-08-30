@@ -4,6 +4,7 @@ description: "Add your own categories of images, GIFs and SVGs — with their ow
 endpoint: "/custom-emojis"
 package: dash-emoji-mart
 category: "Custom emojis"
+order: 10
 icon: "tabler:photo-plus"
 lastmod: 2026-08-01
 ---

@@ -4,6 +4,7 @@ description: "The pattern most apps actually want — a trigger button that open
 endpoint: "/popover"
 package: dash-emoji-mart
 category: "Dash integration"
+order: 20
 icon: "tabler:message-2-share"
 lastmod: 2026-08-01
 ---

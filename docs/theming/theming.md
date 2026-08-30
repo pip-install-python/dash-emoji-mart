@@ -4,6 +4,7 @@ description: "Light, dark and auto — and how to make the picker follow your ap
 endpoint: "/theming"
 package: dash-emoji-mart
 category: "Configuration"
+order: 20
 icon: "tabler:sun-moon"
 lastmod: 2026-08-01
 ---

@@ -4,6 +4,7 @@ description: "value vs selectedEmoji, reacting to outside clicks, and persisting
 endpoint: "/callbacks"
 package: dash-emoji-mart
 category: "Dash integration"
+order: 10
 icon: "tabler:arrows-exchange"
 lastmod: 2026-08-01
 ---

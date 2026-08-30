@@ -34,6 +34,8 @@ from lib.constants import (
     PAGE_TITLE_PREFIX,
     SITE_BRAND,
 )
+from lib import aside
+from lib.directives.headings import patch_renderer
 from lib.directives.kwargs import Kwargs
 from lib.directives.llms_copy import LlmsCopy
 from lib.directives.props import Props
@@ -56,6 +58,8 @@ class Meta(BaseModel):
     package: str = "dash-emoji-mart"
     category: Optional[str] = None
     icon: Optional[str] = None
+    # Sidebar position within its category; ties break on name.
+    order: int = 1000
     # Who may read this page: public | auth | admin | hidden. Absent means
     # the deployment default (PAGE_DEFAULT_TIER, else public) — see
     # lib/page_tiers.py for the tier model and why the default is open.
@@ -216,6 +220,14 @@ def _build_llms_doc(name: str, description: str, expanded: str, path: str) -> st
 # which instantiates the renderer.
 markdown_inline.apply()
 
+# Headings containing inline code or emphasis crash markdown2dash's renderer
+# and, when they don't, get an id their own TOC anchor does not match; and
+# inline `![alt](src)` has no renderer at all, so mistune's HTML fallback runs
+# and raises on the DMC child list. Both are fixed here. Disjoint from
+# markdown_inline above (heading/image vs emphasis/strong/strikethrough), so
+# the two patches compose; both must precede create_parser.
+patch_renderer()
+
 # Kwargs() stays for DMC components (numpy docstrings); Props() handles
 # dash-generate-components output, which Kwargs silently renders as an empty
 # table. See lib/directives/props.py.
@@ -239,6 +251,12 @@ for file in files:
 
     # The "copy for LLMs" button reads the raw markdown back out of here.
     NAME_CONTENT_MAP[metadata.name] = content
+
+    # Pages with a `.. toc::` fill the right-hand aside; the shell collapses
+    # that column for every other page (lib/aside.py) — otherwise /changelog
+    # and /api render inside the docs column with an empty right gutter.
+    if ".. toc::" in content:
+        aside.register(metadata.endpoint)
 
     layout = parse(content)
 
@@ -291,6 +309,7 @@ for file in files:
         ),
         category=metadata.category,
         icon=metadata.icon,
+        order=metadata.order,
     )
 
     # Record the declared tiers before the prose is registered, so a gate can
