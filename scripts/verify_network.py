@@ -32,6 +32,20 @@ os.environ.setdefault("AD_SERVER_URL", "http://127.0.0.1:1")
 failures: list[str] = []
 
 
+try:
+    from lib.constants import INTERNAL_UA as _INTERNAL_UA
+except Exception:  # pragma: no cover — running outside a repo checkout
+    _INTERNAL_UA = "2plot-internal/1.0 (+https://2plot.ai/docs/satellite-analytics)"
+
+# The third encoding of the browser lane in this repo (scripts/network_smoke.py
+# and scripts/smoke_live.py are the other two); all three move together.
+BROWSER_UA = (
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 "
+    "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36 "
+    + _INTERNAL_UA + " verify-network"
+)
+
+
 def check(name: str, ok: bool, detail: str = "") -> None:
     print(f"  {'PASS' if ok else 'FAIL'}  {name:<44} {detail}")
     if not ok:
@@ -46,6 +60,19 @@ def main() -> int:
     client = run.app.server.test_client()
 
     def get(path: str, **kwargs):
+        # DEFAULT TO THE BROWSER LANE (template 1.6.40 item 17, ported into
+        # this fork-original tool). At dash-improve-my-llms >= 2.8 a request
+        # with NO User-Agent is crawler-lane — so every bare `get()` here was
+        # reading the prerendered crawler document, and the prerender-marker
+        # check below has been RED on main since the floor moved without
+        # anyone seeing it: this script is hand-run, not wired into CI.
+        # Measured in this tree: `data-dimll-prerender="1"` is on the BROWSER
+        # document; the crawler lane never carries it. The internal token
+        # stays in the string, AFTER the engine token, so the far side's
+        # internal-traffic exclusion still holds (substring match).
+        # A check that means the crawler lane passes its own UA explicitly.
+        kwargs.setdefault("headers", {})
+        kwargs["headers"].setdefault("User-Agent", BROWSER_UA)
         return client.get(path, **kwargs)
 
     print("=" * 78)
@@ -56,9 +83,20 @@ def main() -> int:
     print("\n[health]")
     resp = get("/healthz")
     check("/healthz returns 200", resp.status_code == 200, f"HTTP {resp.status_code}")
-    check("/healthz reports ok", resp.get_json(silent=True) == {
-        "ok": True, "backend": "flask", "dash_version": dash.__version__,
-    }, str(resp.get_json(silent=True)))
+    # The payload GROWS by design — `python` and `geo` arrived with later
+    # template items and this frozen three-key equality had been red on main
+    # ever since, silently, because nothing runs this script but a person.
+    # Assert the contract: the keys this host promises, with the values that
+    # can actually be wrong. `build` is Render-only and absent locally.
+    body = resp.get_json(silent=True) or {}
+    missing = [k for k in ("ok", "app", "backend", "dash_version", "python", "geo")
+               if k not in body]
+    check("/healthz carries the fleet shape", not missing, f"missing {missing}")
+    check("/healthz reports ok",
+          body.get("ok") is True
+          and body.get("backend") == "flask"
+          and body.get("dash_version") == dash.__version__,
+          str(body))
 
     # -- canonical ---------------------------------------------------------
     # The shim-collision check. 2.3.3's prerender writes the canonical tag;
@@ -215,7 +253,14 @@ def main() -> int:
     print("\n[sitemap]")
     sitemap = get("/sitemap.xml").get_data(as_text=True)
     urls = re.findall(r"<loc>([^<]+)</loc>", sitemap)
-    check("sitemap lists all 8 pages", len(urls) == 8, f"{len(urls)} urls")
+    # Counted from the registry, never a literal: this said `== 8` and the
+    # nav round's /changelog and /api made it 10 — a check that has to be
+    # edited every time a page is added is a check that gets edited wrong.
+    expected = len([p for p in dash.page_registry.values()
+                    if not (p["path"] or "").startswith("/admin/")
+                    and p["path"] != "/404"])
+    check(f"sitemap lists every public page ({expected})",
+          len(urls) == expected, f"{len(urls)} urls, registry says {expected}")
     check("every sitemap url is on this host",
           all(u.startswith("https://emojimart.2plot.dev") for u in urls),
           sorted(urls)[:2])

@@ -278,6 +278,37 @@ not on the table — so it needs a selector of its own, which has no
 counterpart upstream because the directive has none. The comment above
 the rule previously CLAIMED it covered both; it never did.
 
+### 14. There is a THIRD live tool: `scripts/verify_network.py`
+
+The template ships two (`scripts/network_smoke.py`,
+`scripts/smoke_live.py`). This repo has a third, fork-original and
+predating these records: an IN-PROCESS verifier that drives
+`run.app.server.test_client()` rather than a URL, so it can assert
+things the wire cannot show — directive leakage in every page's
+`llms.txt`, the canonical shim collision, the peer directory stripping
+this app from its own peer list.
+
+Recorded now because it is load-bearing for the same contracts the
+other two carry, and each round has found it holding a stale copy of
+one:
+
+- the crawler-posture fingerprint (item 15) — it had its own
+  `ClaudeBot -> Disallow` assert, in neither tool the item named;
+- the browser-lane default UA (item 17) — it sent NO User-Agent at
+  all, which is the crawler lane at dimll ≥ 2.8.
+
+**A sync must not delete it, and must not assume two tools where the
+files list says two.** When a spec moves a lane, a fingerprint or a
+floor in the live tools, it moves in three places here.
+
+Its one real hazard is recorded with it: it is wired into neither CI
+nor CD, so nothing but a person running it ever reports its result.
+Both defects above were RED on `main` for an unknown period before
+this round found them by hand. Pinning what can be pinned offline is
+the mitigation — `tests/test_network_lanes.py` holds its UA lane, and
+its assertions now count from the page registry rather than from
+literals that go stale silently.
+
 ## Byte-owned paths
 
 Paths this fork owns byte-for-byte. The F3b fan-out never overwrites

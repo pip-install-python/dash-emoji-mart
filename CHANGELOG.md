@@ -8,8 +8,31 @@ this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 ## [Unreleased] — the docs site
 
 Nothing here changes `pip install dash-emoji-mart`; this is the site.
-Consumed template SYNC-1.6.22-1.6.35 items 12 and 13 (template `4c63992`)
-and SYNC-1.6.22-1.6.38 items 15 and 16 (template `519d496`).
+Consumed template SYNC-1.6.22-1.6.35 items 12 and 13 (template `4c63992`),
+SYNC-1.6.22-1.6.38 items 15 and 16 (template `519d496`), and
+SYNC-1.6.22-1.6.40 item 17 (template `8ceca5c`).
+
+### Fixed — the verification tools were reading the wrong document
+
+- **Every live tool's default User-Agent now names the browser lane.** At
+  dash-improve-my-llms ≥ 2.8 a User-Agent with no browser engine token is
+  crawler-lane, so `scripts/network_smoke.py`'s bare internal token — and
+  `scripts/verify_network.py`'s *absent* UA — made every default-UA check read
+  the prerendered crawler document instead of the page a person sees. The
+  internal token stays in the string, after the engine token, so these probes
+  still never count as real traffic. `CRAWLER_UA` is untouched: it is the
+  other lane, and collapsing the two would make every crawler assertion
+  vacuous.
+- **`verify_network.py`'s "prerender marker present" check had been red on
+  `main`** for an unknown period, and nothing said so — that script is
+  hand-run and wired into neither CI nor CD. Measured here:
+  `data-dimll-prerender="1"` is on the *browser* document and the crawler lane
+  never carries it, so a check reading the crawler document could only fail.
+- **Two stale assertions in the same tool**, found once it ran clean enough to
+  see them: `/healthz` was compared against a frozen three-key dict while the
+  payload had grown `python` and `geo`, and the sitemap count was the literal
+  `8` that `/changelog` and `/api` turned into 10. Both now assert the
+  contract — the promised keys, and a count derived from the page registry.
 
 ### Added — navigation
 
