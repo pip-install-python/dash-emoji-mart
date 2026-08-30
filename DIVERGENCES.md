@@ -45,9 +45,20 @@ this host serves. `tests/test_claude_kit.py` validates the SHAPE only.
               drift, never a reason to deploy by hand. ABSENT would
               read as `main`.
 
-Measured on emojimart.2plot.dev, 2026-08-29, build 53bc5e8 — the
-ai_bots row with `-A ClaudeBot/1.0`, the healthz row from the live
-payload, the runtime and deploy rows from render.yaml in this commit.
+Measured on emojimart.2plot.dev, 2026-08-30T14:18Z, build 53bc5e8 —
+the ai_bots row with a real vendor UA (ClaudeBot AND GPTBot, both
+identical: 403 / 200 / 403), the healthz row from the live payload,
+the runtime and deploy rows from render.yaml in this commit.
+
+**This ai_bots row is INTERIM and will be wrong the moment this work
+deploys.** The training wall is retired in `run.py`
+(`block_ai_training=False`, the posture flip) but that commit is not
+on the wire yet: in-process, after the flip, both UAs get 200 on all
+three paths and robots.txt carries no `Disallow` at all. Re-measure
+the six lines and re-date this block on the first promote — and if
+`/` still 403s on the wire while in-process answers 200, that
+difference is something in FRONT of the app, not the app: name it and
+hand it to the owner rather than editing `run.py` again.
 
 ```yaml posture
 ai_bots: {"/": 403, "/llms.txt": 200, "/healthz": 403}

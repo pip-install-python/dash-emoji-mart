@@ -108,8 +108,10 @@ def main() -> int:
           f"{len(body):,} bytes")
 
     # -- robots ------------------------------------------------------------
-    # The >=2.3.3 fingerprint: training crawlers disallowed only when
-    # block_ai_training=True; the user-initiated search fetchers always allowed.
+    # The >=2.3.3 fingerprint for the ALLOWED fetchers, plus the posture check
+    # for the training crawlers — this host retired the training wall
+    # (run.py `block_ai_training=False`), so their stanza is absent, not
+    # Disallow.
     print("\n[robots]")
     robots = get("/robots.txt").get_data(as_text=True)
     check("/robots.txt served", bool(robots.strip()), f"{len(robots)} bytes")
@@ -124,12 +126,16 @@ def main() -> int:
     check("no leftover OAI-SearchBot Disallow workaround",
           "Disallow" not in oai, oai.splitlines()[:2])
 
-    # The >=2.3.3 fleet fingerprint, and the reason block_ai_training=True is
-    # now safe: the bulk training crawler is refused while the user-initiated
-    # fetchers above are allowed.
-    claude = agent_block("ClaudeBot")
-    check("ClaudeBot -> Disallow", claude.startswith("Disallow:"),
-          claude.splitlines()[:1] or "absent")
+    # POSTURE, not artifact (template 1.6.37, Round 3.4): the training wall is
+    # retired here, so the package emits no training stanza at all — absent and
+    # Allow are both the allow shape, and only Disallow is a failure. This is
+    # the THIRD encoding of the fingerprint in this repo (network_smoke.py and
+    # smoke_live.py are the other two); all three move together.
+    for training in ("ClaudeBot", "GPTBot"):
+        block = agent_block(training)
+        check(f"{training} not Disallowed (posture flip)",
+              not block.startswith("Disallow:"),
+              block.splitlines()[:1] or "absent")
     for allowed in ("Claude-User", "ChatGPT-User"):
         block = agent_block(allowed)
         check(f"{allowed} -> Allow", block.startswith("Allow:"),

@@ -280,19 +280,17 @@ _auth.configure_app(app)
 # set its origin explicitly must refuse rather than claim this repo's default.
 require_owned_base_url()
 app._base_url = BASE_URL
-# block_ai_training=True is the network-wide posture, and on 2.3.2/2.3.3 it is
-# finally the safe one. The taxonomy was corrected so True disallows the genuine
-# bulk training crawlers (GPTBot, ClaudeBot, CCBot) while still ALLOWING the
-# user-initiated fetchers (Claude-User, Claude-SearchBot, ChatGPT-User,
-# OAI-SearchBot) — so the old reason to run False, that True broke claude.ai
-# fetches through the legacy aliases, is gone.
-#
-# This is what produces the >=2.3.3 fleet fingerprint the deploy battery checks:
-#   ClaudeBot     -> Disallow    (bulk training)
-#   OAI-SearchBot -> Allow       (user-initiated retrieval)
-# The docs stay fully reachable by anything a person actually asked to fetch
-# them; only unattended corpus scraping is refused. Flip the flag and this
-# comment together if that ever changes.
+# The crawler posture itself is set further down, where `RobotsConfig` is
+# built — read that comment for WHY the training wall was retired. What
+# survives here is the half 2.3.3 bought and the flip did not change: the
+# taxonomy is per vendor, so the user-initiated fetchers (Claude-User,
+# Claude-SearchBot, ChatGPT-User, OAI-SearchBot) are named and allowed in
+# their own right rather than swept up with the bulk crawlers. That is what
+# makes the deploy battery's remaining artifact fingerprint mean something:
+#   OAI-SearchBot -> Allow       (user-initiated retrieval, since 2.3.2)
+#   Claude-User   -> Allow       (since 2.3.3)
+# The training crawlers are no longer in that tuple — their shape is posture,
+# not artifact, and all three live tools assert the ABSENCE of a Disallow.
 # ----------------------------------------------------------------------------
 # Site identity for the CRAWLER document (dash-improve-my-llms >= 2.5.0).
 #
@@ -339,10 +337,33 @@ configure_seo(
     same_as=SAME_AS,
 )
 
+# Crawler posture — THE WALL IS RETIRED (template 1.6.37, Round 3.4, owner
+# decision 2026-08-29). Until this commit this host blocked the AI-training
+# crawlers (GPTBot, ClaudeBot, CCBot, …): robots.txt said Disallow and the
+# package's middleware answered 403 on the browser document and /healthz, while
+# the corpus (/llms.txt and the tiers) stayed open — a wall that decided by
+# vendor CLASS what nobody could account for. Measured on this host's wire
+# 2026-08-30T14:18Z, build 53bc5e8: ClaudeBot and GPTBot each got 403 on `/`,
+# 200 on `/llms.txt`, 403 on `/healthz`.
+#
+# The ledger changed the argument. Since the read table every corpus read is a
+# row — tier, vendor, verified, bytes — and the hub reconciles it against the
+# wire. A read that is recorded and priceable does not need a wall; it needs a
+# policy. So training crawlers are ALLOWED here now, the same as the search
+# fetchers and traditional bots, and the per-vendor knob is the tool from here
+# on: block or meter ONE vendor by name when its own ledger rows justify it,
+# never the whole class —
+#
+#     vendor_policy={"bytespider": "block", "gptbot": "meter"}
+#
+# 2.3.3's per-vendor buckets still matter: they are what makes a per-vendor
+# line mean the vendor it names. A host whose posture fence declares ai_bots
+# 403 BY DESIGN (clerkhook, a locked host) keeps block_ai_training=True and
+# records it; this host's fence declares the open posture instead.
 app._robots_config = RobotsConfig(
-    block_ai_training=True,
-    allow_ai_search=True,
-    allow_traditional=True,
+    block_ai_training=False,      # training crawlers allowed; the ledger records every read
+    allow_ai_search=True,         # Claude-User/-SearchBot, ChatGPT-User, ...
+    allow_traditional=True,       # Googlebot, Bingbot, ...
     crawl_delay=10,
 )
 
