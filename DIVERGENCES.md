@@ -309,6 +309,45 @@ the mitigation — `tests/test_network_lanes.py` holds its UA lane, and
 its assertions now count from the page registry rather than from
 literals that go stale silently.
 
+### 15. `/api` reads the component's DOCSTRING, because this repo has no shipped `metadata.json`
+
+`lib/api_reference.py` — `_from_docstrings`, and the fallback in
+`load_package`
+
+SYNC-1.6.22-1.6.38 item 16 contract (7) generates the `/api` page from
+the component package's `metadata.json`. **This repo excludes that file
+in three places on purpose** — `.gitignore`, `MANIFEST.in` and
+`pyproject.toml`, each stating that nothing loads it at runtime — so it
+exists only in a working tree that has run `dash-generate-components`
+and is absent from every clean checkout, both CI runners, and the
+Docker image that serves production.
+
+The template's loader returns `[]` there, silently. That is the same
+empty-table failure §7 already records for `.. kwargs::`: the page
+builds, every smoke check passes, and the table is empty. It reached CD
+before anything caught it — run 33335469726, `deploy` correctly
+skipped.
+
+So the docstring is the fallback and, on this host, the only source
+that ever runs. It is parsed by `lib/directives/props.py`'s
+`_parse_dash_docstring` — the parser this fork already wrote for this
+exact docstring shape — rather than a second implementation that could
+drift from the first. Measured: 34 props via `metadata.json`, 33 via
+the docstring. The difference is `style`, which the component's own
+docstring never declares (it appears only inside another prop's prose)
+— a property of the docstring, not of the parser, and pinned as such.
+
+The three exclusions were NOT reversed to make the page work. They are
+a deliberate, documented decision of this repo, and "nothing loads it
+at runtime" stopped being true the moment `/api` existed — but the
+right answer to that is a loader that reads what this host actually
+ships, not a fourth place to keep a build artifact in sync.
+
+**Consequence for the byte-identity audit:** `lib/api_reference.py` was
+reported byte-identical to the template at `519d496` in the item 16
+report. It is no longer, and it should not be — a byte copy renders an
+empty page here. Nine files remain byte-identical, not ten.
+
 ## Byte-owned paths
 
 Paths this fork owns byte-for-byte. The F3b fan-out never overwrites

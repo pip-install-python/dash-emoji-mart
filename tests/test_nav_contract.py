@@ -289,6 +289,40 @@ def test_the_api_page_is_registered_for_this_fork(app_module):
     assert pkgs and "error" not in pkgs[0], pkgs
     names = [c["name"] for c in pkgs[0]["components"]]
     assert "DashEmojiMart" in names, names
+    props = pkgs[0]["components"][0]["props"]
+    assert len(props) > 25, f"only {len(props)} props — is the page empty?"
+
+
+def test_the_api_page_does_not_need_metadata_json(tmp_path, monkeypatch):
+    """THE REGRESSION THIS FILE EXISTS FOR — caught by CD run 33335469726,
+    not by a local run.
+
+    `dash_emoji_mart/metadata.json` is excluded from git, from the wheel and
+    from the package data, in three places that each say "nothing loads it at
+    runtime". It therefore exists ONLY in a working tree that has run
+    dash-generate-components, and is absent from every clean checkout, both
+    CI runners and the Docker image that serves production. Upstream's loader
+    returns [] there — so /api would have rendered with no tables, in
+    production, while every check stayed green.
+
+    Simulated by pointing the loader at a package directory with no
+    metadata.json: the docstring fallback must still produce the component.
+    """
+    from lib import api_reference
+
+    # Resolve the metadata path into an empty tmp dir, so `is_file()` is False
+    # without touching the real package tree.
+    monkeypatch.setattr(api_reference, "Path", lambda *_a, **_k: tmp_path / "pkg")
+    got = api_reference.load_package("dash_emoji_mart")
+
+    assert [c["name"] for c in got] == ["DashEmojiMart"], got
+    names = {p["name"] for p in got[0]["props"]}
+    assert len(names) > 25, f"docstring fallback produced {len(names)} props"
+    assert {"perLine", "theme", "set"} <= names
+    # `style` is the one prop metadata.json carries that the component's own
+    # docstring never declares — it appears only inside another prop's prose.
+    # Recorded as a measured fact so the gap is not a surprise later.
+    assert "style" not in names
 
 
 def test_missing_package_is_reported_not_raised():
