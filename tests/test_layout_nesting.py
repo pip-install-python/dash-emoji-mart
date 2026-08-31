@@ -122,17 +122,18 @@ def test_the_docs_pages_really_carry_their_parsed_content(registry):
     # page that registered a TOC. Naming a page here made this file the one
     # thing in the pin that a fork has to edit, and a renamed page turned a
     # real control into a KeyError.
-    from lib.aside import ASIDE_PATHS
-
-    # THE ROOT IS EXCLUDED, and that is a fork difference worth naming: this
-    # site's `/` heads itself with SITE_BRAND rather than its nav label
-    # ("Home" names nothing on the most-linked URL on the site), so
-    # `page["name"] in str(layout)` is false there by design. The template's
-    # copy has no such rule and can take the first TOC page whatever it is.
-    docs_paths = sorted(p for p in ASIDE_PATHS if p != "/")
-    assert docs_paths, "no docs page registered a TOC"
+    # Derived from the REGISTRY ALONE (template 1.6.43, filed by clerkhook,
+    # which has no lib/aside to import). Admin and `/` excluded — and that
+    # exclusion, which this fork added for its own reason, is now the
+    # template's too: this site's root heads itself with SITE_BRAND rather
+    # than its nav label, so `page["name"] in str(layout)` is false there by
+    # design. The fork rule and the fleet rule turned out to be one rule.
     by_path = {p.get("path"): p for p in registry.values()}
-    page = by_path[docs_paths[0]]
+    docs = sorted(p for p in by_path
+                  if p and p != "/" and not p.startswith("/admin/")
+                  and p not in ("/404", "/api", "/changelog"))
+    assert docs, "no docs page registered"
+    page = by_path[docs[0]]
     layout = _resolve(page["layout"])
 
     nodes: list = []

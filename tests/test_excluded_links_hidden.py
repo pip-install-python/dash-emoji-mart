@@ -69,7 +69,11 @@ def test_admin_paths_absent_from_sitemap_llms_and_sidebar(client, app):
             # that hid them — a true statement about the site, not a leak,
             # and a pin that forbids writing prose about your own admin
             # pages will be deleted by the first person it inconveniences.
-            if f"{path})" in text or f"{path}/llms.txt" in text:
+            # BOTH clauses link-shaped (the seat's fix to my own report):
+            # I argued the match must be a link and then left the second
+            # clause a bare substring — the same half-applied narrowing I
+            # warned about, in the same line. llms caught it upstream.
+            if f"{path})" in text or f"{path}/llms.txt)" in text:
                 leaked.append(f"{path} in {doc}")
         if path in tree:
             leaked.append(f"{path} in the startup sidebar tree")

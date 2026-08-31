@@ -21,6 +21,8 @@ from __future__ import annotations
 
 import pytest
 
+from conftest import BROWSER_UA
+
 
 def test_healthz(client):
     """The 2plot.ai hub probes this hourly, on whichever backend is running."""
@@ -49,6 +51,11 @@ def test_healthz_is_live_not_a_snapshot(monkeypatch):
     stub = SimpleNamespace(server=Flask("healthz_snapshot_pin"))
     register_health_route(stub, "flask")
     probe = stub.server.test_client()
+    # Names the browser lane (template 1.6.43's per-call-site pin). This stub
+    # registers ONLY the healthz route — no dimll middleware, so there is no
+    # lane here to get wrong — but the pin cannot tell a bare app from a real
+    # one, and a UA on a client that ignores it costs nothing.
+    probe.environ_base["HTTP_USER_AGENT"] = BROWSER_UA
     assert probe.get("/healthz").get_json()["app"] == "before"
 
     monkeypatch.setenv("SATELLITE_APP_KEY", "after")

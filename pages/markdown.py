@@ -159,7 +159,38 @@ def _expand_source_directives(markdown_content: str) -> str:
         except Exception as exc:  # noqa: BLE001 - never break page registration
             return f"\n<!-- Error reading {file_path}: {exc} -->\n"
 
+    def exec_target_file(module_path: str) -> str:
+        """`docs.iconify.example` -> `docs/iconify/example.py`."""
+        return module_path.strip().split("\n")[0].strip().replace(".", "/") + ".py"
+
     lines = markdown_content.split("\n")
+
+    # THE EXEC LANE (template 1.6.43, owner's decision 0aa). `.. exec::`
+    # renders a component into the React tree; the machine lane is built from
+    # this markdown, where the directive line is stripped — so a page could
+    # describe a demo whose code appears nowhere in the document an agent
+    # reads. Expanding the module's SOURCE is what an agent can actually use:
+    # a component cannot be serialised into markdown, and a screenshot is
+    # worse than nothing to a reader who cannot render it.
+    #
+    # DEDUPE, on the PAIRING axis: skipped where the page already carries a
+    # `.. source::` for the SAME target — the hand-authored road seven of
+    # this fork's eight exec-using pages already take — and NOT skipped for a
+    # `.. source::` naming a different file. Measured before porting: 8
+    # unfenced `.. exec::`, 7 already paired, one unpaired
+    # (docs/api-reference/example.py), which is the only page this changes.
+    paired = set()
+    _fence = None
+    for probe in lines:
+        _head = probe.lstrip()[:3]
+        if _fence is None and _head in ("```", "~~~"):
+            _fence = _head
+        elif _fence is not None and _head == _fence:
+            _fence = None
+        elif _fence is None and probe.startswith(".. source::"):
+            paired.add(probe[len(".. source::"):].strip().split()[0]
+                       if probe[len(".. source::"):].strip() else "")
+
     out: List[str] = []
     fence = None  # the marker that opened the block we are inside, if any
     i = 0
@@ -171,6 +202,17 @@ def _expand_source_directives(markdown_content: str) -> str:
             fence = head
         elif fence is not None and head == fence:
             fence = None
+        elif fence is None and line.startswith(".. exec::"):
+            module_path = line[len(".. exec::"):].strip()
+            target = exec_target_file(module_path)
+            i += 1
+            while i < len(lines) and _DIRECTIVE_OPTION.match(lines[i]):
+                i += 1
+            # The directive line itself is dropped either way — it is noise in
+            # the machine lane. Only the expansion is conditional.
+            if target not in paired:
+                out.append(expand(target))
+            continue
         elif fence is None and line.startswith(".. source::"):
             path_text = line[len(".. source::"):].strip()
             i += 1

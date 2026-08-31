@@ -71,9 +71,13 @@ def main() -> int:
         # stays in the string, AFTER the engine token, so the far side's
         # internal-traffic exclusion still holds (substring match).
         # A check that means the crawler lane passes its own UA explicitly.
-        kwargs.setdefault("headers", {})
-        kwargs["headers"].setdefault("User-Agent", BROWSER_UA)
-        return client.get(path, **kwargs)
+        headers = dict(kwargs.pop("headers", None) or {})
+        headers.setdefault("User-Agent", BROWSER_UA)
+        # `headers=` passed EXPLICITLY at the call, not folded into **kwargs:
+        # the fleet's per-call-site pin reads the call text, and a UA that
+        # arrives through a dict splat is invisible to it. Legible to the
+        # reader for the same reason it is legible to the grep.
+        return client.get(path, headers=headers)
 
     print("=" * 78)
     print(" 2plot network verification · dash-emoji-mart")
@@ -268,10 +272,12 @@ def main() -> int:
     # -- SPA beacon --------------------------------------------------------
     # The half of the ledger the boilerplate's trio does not cover.
     print("\n[spa beacon]")
-    resp = client.post("/api/pageview", json={"path": "/theming"})
+    resp = client.post("/api/pageview", json={"path": "/theming"},
+                       headers={"User-Agent": BROWSER_UA})
     check("/api/pageview accepts a valid path", resp.status_code == 200,
           f"HTTP {resp.status_code}")
-    resp = client.post("/api/pageview", json={"path": "not-a-path"})
+    resp = client.post("/api/pageview", json={"path": "not-a-path"},
+                       headers={"User-Agent": BROWSER_UA})
     check("/api/pageview rejects a junk path", resp.status_code == 400,
           f"HTTP {resp.status_code}")
 
