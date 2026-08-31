@@ -364,7 +364,44 @@ ships, not a fourth place to keep a build artifact in sync.
 **Consequence for the byte-identity audit:** `lib/api_reference.py` was
 reported byte-identical to the template at `519d496` in the item 16
 report. It is no longer, and it should not be — a byte copy renders an
-empty page here. Nine files remain byte-identical, not ten.
+empty page here. Nine files remained byte-identical at that sha, not
+ten; re-measured at `4ac02e0` the count is eleven (see item 18).
+
+### 15a. What item 18 changed here — the contract adopted, the bytes still declined
+
+Template 1.6.41 answered this defect on the template's own side, and
+its answer is BETTER than the one recorded above: a COMMITTED EXTRACT,
+`<package>/api_metadata.json`, written by `scripts/build_api_metadata.py`
+from the react-docgen artifact. It is a DIFFERENT file from
+`metadata.json`, so it sidesteps this repo's three exclusions instead
+of arguing with them, and it carries a `generated` date that is /api's
+sitemap lastmod.
+
+**Adopted in full.** `load_package` is now a three-rung ladder —
+`metadata.json` (a rebuilt tree) → the committed extract → the
+docstrings — plus `slim_generated_on`, `_cell` pipe-escaping, and a
+named `_from_metadata` seam so `scripts/build_api_metadata.py` is
+byte-identical cargo here. Two things this bought, measured:
+
+- **/api serves 34 props on a clean checkout, not 33.** `style` is
+  declared in `metadata.json` and never in the component's docstring,
+  so the docstring rung alone could not reach it. The gap reported at
+  item 17 is closed rather than merely explained.
+- **/api carries a lastmod** (`2026-08-30`), which the docstring rung
+  cannot honestly produce.
+
+**The bytes are still declined**, and the reason is narrower than it
+was: template 1.6.41's `lib/api_reference.py` carries its OWN
+`_from_docstrings`. Adopting the file would put a second docstring
+parser in this tree beside `lib/directives/props._parse_dash_docstring`,
+which exists for this same component's docstring shape and drives
+`.. props::` on /api-reference. Two parsers for one format drift, and
+the one that drifts is the one nobody is looking at. Recorded in the
+`byte-owned` fence below with item 14's `# declined:` grammar.
+
+The docstring rung is now genuinely a last resort here rather than the
+only road — which is the right place for it, and is why this decline is
+about one function and not about the item.
 
 ## Byte-owned paths
 
@@ -397,7 +434,12 @@ Its bytes here are the template's at 5589318, verified by digest. The
 new §9 names `.github/workflows/ci.yml`, which no spec byte-copies.
 Still empty, still by audit.
 
+NO LONGER EMPTY, as of item 18. One declined entry — the grammar is
+item 14's: `- <path>  # declined: <reason>`, and the reason is
+mandatory.
+
 ```yaml byte-owned
+- lib/api_reference.py  # declined: template 1.6.41's copy carries its own _from_docstrings; this tree already has that parser in lib/directives/props.py for the same component's docstring shape, and two parsers for one format drift. DIVERGENCES §15. The CONTRACT is adopted in full — the metadata.json -> committed extract -> docstring ladder, slim_generated_on, _cell escaping and the named _from_metadata seam the generator imports — so scripts/build_api_metadata.py is byte-identical cargo here. Only the bytes are refused.
 ```
 
 ## Retired

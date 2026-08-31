@@ -38,21 +38,55 @@ def test_admin_paths_absent_from_sitemap_llms_and_sidebar(client, app):
     from components.navbar import create_content
 
     sitemap = client.get("/sitemap.xml").text
-    llms = client.get("/llms.txt").text
     tree = str(create_content(dash.page_registry.values()))
+
+    # THE WHOLE CORPUS, not just the index (template 1.6.42, llms's note 75):
+    # PROSE CAN LEAK WHAT STRUCTURE HIDES. On llms.2plot.dev, hyperlinking
+    # /admin/control-board in five docs pages put the path into /llms.txt
+    # while every navbar, sitemap and tier pin passed — the page was hidden
+    # and its address published anyway. The tier documents concatenate page
+    # bodies, so they carry any such link too; sweeping only the index is
+    # how that went unseen. The seat swept twelve hosts and only llms leaked,
+    # which is exactly why the pin has to outlive the one host that failed.
+    corpus = {}
+    for doc in ("/llms.txt", "/llms-small.txt", "/llms-full.txt"):
+        r = client.get(doc)
+        if r.status == 200:
+            corpus[doc] = r.text
+    assert "/llms.txt" in corpus, "the site index must be served"
 
     leaked = []
     for path in _admin_paths():
         if f"{path}</loc>" in sitemap:
             leaked.append(f"{path} in sitemap.xml")
-        if f"{path})" in llms or f"{path}/llms.txt" in llms:
-            leaked.append(f"{path} in /llms.txt")
+        for doc, text in corpus.items():
+            # LINK-SHAPED, not any mention — the template's match, applied
+            # across the corpus rather than only the index. `](/admin/x)` or
+            # `(/admin/x)` is an address an agent can follow; `/admin/x`
+            # inside a backticked code span in a changelog is documentation.
+            # Broadening this to a substring made it fire on THIS repo's own
+            # CHANGELOG, which describes the admin pages in the same entry
+            # that hid them — a true statement about the site, not a leak,
+            # and a pin that forbids writing prose about your own admin
+            # pages will be deleted by the first person it inconveniences.
+            if f"{path})" in text or f"{path}/llms.txt" in text:
+                leaked.append(f"{path} in {doc}")
         if path in tree:
             leaked.append(f"{path} in the startup sidebar tree")
     assert leaked == [], f"admin pages published: {leaked}"
 
     # Positive control: a real page IS listed, so an empty sitemap or a
     # broken llms.txt cannot make the assertions above pass vacuously.
-    assert "/configuration</loc>" in sitemap
-    assert "/configuration" in llms
-    assert "/configuration" in tree
+    # Derived from the sidebar's own first page (template 1.6.41), never
+    # named, so this file is fork-invariant.
+    from components.navbar import sections_for
+
+    sections = sections_for(dash.page_registry.values())
+    assert sections, "the sidebar has no docs section"
+    control = sections[0][1][0]["path"]
+    assert f"{control}</loc>" in sitemap
+    assert control in corpus["/llms.txt"]
+    assert control in tree
+    # And the corpus really was swept: a tier doc that 404s would make the
+    # loop above pass by iterating one document.
+    assert len(corpus) > 1, f"only {sorted(corpus)} served — tier docs off?"

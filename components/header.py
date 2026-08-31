@@ -24,7 +24,12 @@ from lib.constants import (
     EMOJI_MART_VERSION,
     GITHUB_URL,
     HEADER_HEIGHT,
+    LOGO_ICON,
+    LOGO_WIDTH,
     SITE_SHORT_NAME,
+    WORDMARK,
+    WORDMARK_COLOR,
+    WORDMARK_VISIBLE_FROM,
 )
 
 
@@ -46,7 +51,7 @@ def create_clerk_avatar():
     return create_clerk_menu(show_dropdown=True, dropdown_align="right")
 
 
-def create_link(icon, href, label):
+def create_link(icon, href, label, visible_from=None):
     """An external-link icon button.
 
     ``label`` is REQUIRED, and positionally so — an icon-only control has no
@@ -70,6 +75,11 @@ def create_link(icon, href, label):
         ),
         href=href,
         target="_blank",
+        # `visibleFrom` REMOVES the control from the accessibility tree at
+        # narrower widths — never opacity or width tricks, which leave it
+        # readable to a screen reader while invisible to everyone else
+        # (template 1.6.41). The footer carries GitHub on phones.
+        visibleFrom=visible_from,
         **{"aria-label": label},
     )
 
@@ -237,8 +247,8 @@ def create_header(data):
                                     # every emoji library's placeholder and
                                     # named nothing about this one.
                                     DashIconify(
-                                        icon="noto:cowboy-hat-face",
-                                        width=28,
+                                        icon=LOGO_ICON,
+                                        width=LOGO_WIDTH,
                                     ),
                                     dmc.Stack(
                                         [
@@ -258,12 +268,12 @@ def create_header(data):
                                             # down that writes to this id keeps
                                             # firing on every viewport.
                                             dmc.Text(
-                                                "dash-emoji-mart",
+                                                WORDMARK,
                                                 size="lg",
                                                 fw=700,
-                                                c="yellow",
+                                                c=WORDMARK_COLOR,
                                                 id="dash-docs-title",
-                                                visibleFrom="sm",
+                                                visibleFrom=WORDMARK_VISIBLE_FROM,
                                             ),
                                             dmc.Text(
                                                 f"emoji-mart {EMOJI_MART_VERSION}",
@@ -299,7 +309,8 @@ def create_header(data):
                         create_search(data),
                         create_other_apps_menu(),
                         create_link("radix-icons:github-logo", GITHUB_URL,
-                                    "dash-emoji-mart on GitHub"),
+                                    "dash-emoji-mart on GitHub",
+                                    visible_from="xs"),
                         dmc.ActionIcon(
                             [
                                 DashIconify(

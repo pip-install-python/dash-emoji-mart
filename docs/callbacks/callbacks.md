@@ -5,6 +5,7 @@ endpoint: "/callbacks"
 package: dash-emoji-mart
 category: "Dash integration"
 order: 10
+nav: "Callbacks"
 icon: "tabler:arrows-exchange"
 lastmod: 2026-08-01
 ---

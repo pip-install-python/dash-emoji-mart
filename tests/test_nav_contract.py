@@ -387,3 +387,163 @@ def test_other_apps_dropdown_is_solid_and_every_primary_app_has_an_icon(app_modu
     assert dropdown.styles["dropdown"]["backgroundColor"]
     for url in PRIMARY:
         assert ICONS.get(url) not in (None, "mdi:web"), f"{url} has no icon"
+
+
+def test_battery_hidden_paths_match_the_registry(app_module):
+    """Template 1.6.42 note 74: the battery's literal tuple is pinned
+    against the registry, so a page added, renamed or deleted moves it in
+    the same change.
+
+    This pin arrived with a red on this fork, not green: HIDDEN_DOC_PATHS
+    still carried the TEMPLATE's canary list (`/admin/llms.txt`,
+    `/analytics/llms.txt`) — neither a registered page here — so both 404'd
+    trivially while the two admin pages that DO exist went unchecked. A
+    vacuous pass is worse than no check: it reads as coverage.
+    """
+    import dash
+
+    from scripts.network_smoke import HIDDEN_DOC_PATHS
+
+    admin = {p["path"] for p in dash.page_registry.values()
+             if (p["path"] or "").startswith("/admin/")}
+    assert admin, "no admin pages registered — this pin would be vacuous"
+    assert set(HIDDEN_DOC_PATHS) == {f"{p}/llms.txt" for p in admin}, (
+        "network_smoke.HIDDEN_DOC_PATHS drifted from the registered admin "
+        f"pages: {sorted(HIDDEN_DOC_PATHS)} vs {sorted(admin)}"
+    )
+
+
+def test_every_test_client_user_names_headers():
+    """Template 1.6.42 notes 70/74: a bare test client sends `Werkzeug/x.y`
+    — crawler lane at dimll >= 2.8 — so a mark_hidden page 404s and an
+    every-page-200 loop goes red at the floor bump. Any file that drives
+    `.test_client()` must pass headers naming a lane.
+
+    THIS FORK HAS FOUR request-sending tools, not the template's two, and
+    each one had to be moved separately: network_smoke, smoke_live,
+    verify_network and smoke_test. The grep is what stops a fifth arriving
+    without a lane.
+    """
+    offenders = []
+    for folder in ("tests", "scripts"):
+        for path in sorted((REPO / folder).glob("*.py")):
+            src = path.read_text()
+            names_ua = "headers=" in src or "HTTP_USER_AGENT" in src
+            if ".test_client()" in src and not names_ua:
+                offenders.append(f"{folder}/{path.name}")
+    assert offenders == [], offenders
+
+
+# --------------------------------------------------- /api lane parity --
+#
+# Template 1.6.42 contract highlight (7), amended: a silent `[]` is only the
+# THIRD of four ways /api ships empty. The fourth is structural — a renderer
+# whose output lives ONLY in the React tree while the machine lane, the
+# prerender and the crawler HTML are built from a different source. /api has
+# exactly that shape here: the Dash layout comes from `build_page()`, and
+# LLMS_DOC comes from `as_markdown()`. Both read lib/api_reference, so they
+# cannot disagree about the DATA — but one can be built while the other is
+# not, and nothing above this line would notice.
+#
+# The lesson the amendment draws is about the TEST, not the fix: assert ROWS
+# and row CONTENT, never section headings, and mutation-check the pins.
+# `## dash_emoji_mart` was present on the wire the whole time /api served
+# zero props.
+#
+# NAMING THE ARTIFACT, because "the browser lane" is three things: the
+# app-shell markup, the dimll prerender block inside the SAME received HTML,
+# and the JS-rendered DOM. Measured in this tree: the app-shell markup alone
+# carries NO prop rows — the table reaches a reader either through the
+# prerender block (no JS) or through the React tree (JS). A curl-fetched
+# "Chrome HTML" shows the former and can say nothing about the latter, so
+# the layout tree is asserted directly rather than pretended at.
+
+_API_PROBE = "perLine"          # a real prop of this fork's component
+_API_ROW_RE = r"^\| `[a-zA-Z]"  # a markdown table row, not a heading
+
+
+def _api_lanes(client, app_module):
+    """Every measurable /api artifact, by name."""
+    import re as _re
+
+    from conftest import CRAWLER_UA
+
+    from pages.api import build_page
+    from lib.constants import API_PACKAGES
+
+    browser = client.get("/api").text
+    m = _re.search(r'data-dimll-prerender="1"(.*?)</div>', browser, _re.S)
+    prerender = m.group(1) if m else ""
+    return {
+        "machine /api/llms.txt": client.get("/api/llms.txt").text,
+        "crawler document": client.get("/api", user_agent=CRAWLER_UA).text,
+        "browser: prerender block": prerender,
+        "browser: layout tree (the JS-rendered DOM's source)": str(build_page(API_PACKAGES)),
+    }
+
+
+def test_api_carries_real_rows_in_every_lane(client, app_module):
+    """ROWS and row CONTENT, per lane — never the section heading."""
+    import re as _re
+
+    lanes = _api_lanes(client, app_module)
+    for name, text in lanes.items():
+        assert text, f"{name} is empty"
+        assert _API_PROBE in text, f"{name} carries no {_API_PROBE} prop"
+    # The two markdown lanes must carry real table ROWS, counted.
+    doc = lanes["machine /api/llms.txt"]
+    rows = _re.findall(_API_ROW_RE, doc, _re.M)
+    assert len(rows) > 25, f"/api/llms.txt has {len(rows)} prop rows"
+    # Parity: the machine lane and the prerender describe the same component.
+    assert "DashEmojiMart" in doc
+    assert "DashEmojiMart" in lanes["browser: prerender block"]
+
+
+def test_the_api_lane_pins_go_red_when_the_source_is_empty(client, app_module, monkeypatch):
+    """MUTATION CHECK, which is the half the amendment says was missing:
+    disable the source and watch the pins fail. A lane pin that cannot go
+    red is the same silence it was written to catch."""
+    from lib import api_reference
+    from pages import api as api_page
+
+    monkeypatch.setattr(api_reference, "load_packages",
+                        lambda pkgs: [{"package": p, "components": []} for p in pkgs])
+    monkeypatch.setattr(api_page.api_reference, "load_packages",
+                        api_reference.load_packages, raising=False)
+
+    from lib.constants import API_PACKAGES
+
+    starved = api_reference.as_markdown(API_PACKAGES)
+    assert _API_PROBE not in starved, "the mutation did not actually starve the source"
+    # The heading SURVIVES the mutation — which is exactly why asserting on
+    # it proves nothing, and why this file counts rows instead.
+    assert "dash_emoji_mart" in starved
+    import re as _re
+    assert _re.findall(_API_ROW_RE, starved, _re.M) == []
+
+
+def test_the_skip_link_is_the_first_tab_stop(app_module):
+    """a11y (template 1.6.41): the first tab stop jumps past the sidebar's
+    stops straight to the content.
+
+    ASSERTED ON THE LAYOUT TREE — the JS-rendered DOM's source — and NOT on
+    the received HTML, because a Dash SPA serves the index template and
+    mounts the layout with JS. A curl-shaped check here reports a missing
+    skip link that is present, which is the three-artifact confusion the
+    1.6.42 amendment names from the other direction.
+    """
+    import dash
+
+    tree = str(app_module.app.layout)
+    assert "skip-link" in tree and "Skip to content" in tree
+    assert "'#main-content'" in tree or '"#main-content"' in tree
+
+    # The target exists, and the stylesheet keeps the control OFF-SCREEN
+    # rather than display:none — a display:none skip link is unreachable by
+    # the keyboard, which is the one user it exists for.
+    assert "main-content" in tree
+    css = (REPO / "assets" / "main.css").read_text()
+    assert ".skip-link" in css and ".skip-link:focus" in css
+    block = css.split(".skip-link {", 1)[1].split("}", 1)[0]
+    assert "position: absolute" in block and "left: -9999px" in block
+    assert "display: none" not in block

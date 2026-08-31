@@ -589,3 +589,24 @@ img[alt=logo] { width: 100%; }
 header.mantine-AppShell-header {
     z-index: 150 !important;
 }
+
+/* Skip link (template 1.6.41): the first tab stop, off-screen until keyboard
+   focus, then pinned top-left above the header. Off-screen positioning, NOT
+   display:none — the control has to stay in the accessibility tree to be
+   reachable by the keyboard at all, which is the opposite of the
+   visibleFrom rule that governs controls meant to be gone. */
+.skip-link {
+    position: absolute;
+    left: -9999px;
+    top: 0;
+    z-index: 9999;
+    background: var(--mantine-primary-color-filled);
+    color: var(--mantine-color-black);
+    padding: 8px 14px;
+    border-radius: 0 0 8px 0;
+    font-weight: 600;
+    text-decoration: none;
+}
+.skip-link:focus {
+    left: 0;
+}

@@ -60,6 +60,10 @@ class Meta(BaseModel):
     icon: Optional[str] = None
     # Sidebar position within its category; ties break on name.
     order: int = 1000
+    # Short sidebar label (template 1.6.41); default = name. Shortening
+    # `name:` instead would churn <title>, og:title and the llms.txt
+    # heading — this is the seam that changes only the sidebar and search.
+    nav: Optional[str] = None
     # Who may read this page: public | auth | admin | hidden. Absent means
     # the deployment default (PAGE_DEFAULT_TIER, else public) — see
     # lib/page_tiers.py for the tier model and why the default is open.
@@ -310,6 +314,7 @@ for file in files:
         category=metadata.category,
         icon=metadata.icon,
         order=metadata.order,
+        nav=metadata.nav,
     )
 
     # Record the declared tiers before the prose is registered, so a gate can

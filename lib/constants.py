@@ -58,6 +58,26 @@ PAGE_TITLE_PREFIX = f"{SITE_SHORT_NAME} | "
 
 PRIMARY_COLOR = "yellow"
 
+# The header's mark and wordmark, lifted out of components/header.py
+# (template 1.6.41) so that file holds no fork content.
+#
+# DIVERGENT SHAPE, deliberately: the template names an IMAGE asset
+# (LOGO_ASSET = "ddb.png" + LOGO_STYLE). This site's mark is an Iconify
+# GLYPH — the same U+1F920 the favicon and the share card are rendered
+# from — so one drawing serves the tab icon, the header and an unfurl.
+# An asset path cannot express that, so the seam is the icon name.
+LOGO_ICON = "noto:cowboy-hat-face"
+LOGO_WIDTH = 28
+WORDMARK = SITE_SHORT_NAME
+WORDMARK_COLOR = "yellow"
+# The wordmark is hidden below this breakpoint, where it competes with the
+# burger, search, GitHub link, theme toggle and avatar for a header row
+# that has no room for all of them. `visibleFrom` REMOVES it from the
+# accessibility tree, which is why the home link carries its own
+# aria-label — a control hidden only visually still reads to a screen
+# reader (the fleet's 1.6.41 note; never opacity or width tricks).
+WORDMARK_VISIBLE_FROM = "sm"
+
 # Keep in step with pyproject.toml, package.json and dash_emoji_mart/
 # package-info.json when cutting a release. scripts/check_release.py fails CI if
 # these four ever drift apart.

@@ -5,6 +5,7 @@ endpoint: "/popover"
 package: dash-emoji-mart
 category: "Dash integration"
 order: 20
+nav: "Popover"
 icon: "tabler:message-2-share"
 lastmod: 2026-08-01
 ---

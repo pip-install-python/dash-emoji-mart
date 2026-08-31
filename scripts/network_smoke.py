@@ -89,13 +89,19 @@ DEFAULT_BASE_URL = "http://localhost:8050"
 SAMPLE_PAGE = "/popover"
 
 # Owner-only surfaces that must 404 their llms.txt to an anonymous reader.
-# This template ships no hidden pages, so the list is a canary rather than a
-# census: `/admin` is what a fork will add first, and `mark_hidden("/admin")`
-# has to keep working. A fork adds its own paths here in the same change that
-# marks them hidden.
+#
+# THIS LIST IS A CENSUS HERE, not the template's canary. It carried the
+# template's `/admin/llms.txt` and `/analytics/llms.txt` until now — neither
+# of which is a registered page on this site, so both 404'd trivially while
+# the two pages that DO exist went unchecked. A vacuous pass is worse than
+# no check: it reads as coverage.
+#
+# tests/test_nav_contract.py::test_battery_hidden_paths_match_the_registry
+# pins this tuple against the registered /admin/* pages, so adding, renaming
+# or deleting an admin page moves this list in the same change.
 HIDDEN_DOC_PATHS = (
-    "/admin/llms.txt",
-    "/analytics/llms.txt",
+    "/admin/control-board/llms.txt",
+    "/admin/traffic/llms.txt",
 )
 
 # The hub one level up the chain. A satellite's llms.txt must name it — that

@@ -31,6 +31,9 @@ import importlib
 import json
 from pathlib import Path
 
+# The COMMITTED extract (template 1.6.41). See load_package for the ladder.
+SLIM_METADATA = "api_metadata.json"
+
 
 def _type_name(t) -> str:
     if not isinstance(t, dict):
@@ -88,18 +91,14 @@ def _from_docstrings(mod) -> list[dict]:
     return out
 
 
-def load_package(package: str) -> list[dict]:
-    """``[{name, description, props: [{name, type, required, default, description}]}]``
-    for every component the package exports, sorted by name. Raises
-    ImportError if the package is not installed. Falls back to the
-    components' docstrings when the package ships no ``metadata.json`` —
-    see this module's docstring for why that is the normal case here, and
-    why returning [] instead would render an empty page in production
-    while every check stayed green."""
-    mod = importlib.import_module(package)
-    meta_path = Path(mod.__file__).resolve().parent / "metadata.json"
-    if not meta_path.is_file():
-        return _from_docstrings(mod)
+def _from_metadata(mod, meta_path: Path) -> list[dict]:
+    """Components parsed from a react-docgen ``metadata.json``.
+
+    Named to match the template's seam (1.6.41) so
+    ``scripts/build_api_metadata.py`` is byte-identical cargo here: the
+    generator imports THIS function to distil the multi-megabyte build
+    artifact into the committed extract.
+    """
     meta = json.loads(meta_path.read_text(encoding="utf-8"))
     out = []
     for entry in meta.values():
@@ -118,11 +117,67 @@ def load_package(package: str) -> list[dict]:
                 "description": (p.get("description") or "").strip(),
             })
         props.sort(key=lambda p: (p["name"] != "id", p["name"]))
-        out.append({"name": name, "description": (entry.get("description") or "").strip(), "props": props})
+        out.append({"name": name,
+                    "description": (entry.get("description") or "").strip(),
+                    "props": props})
     out.sort(key=lambda c: c["name"])
-    # A metadata.json that matched no exported component is the same empty
-    # page as no metadata.json at all — fall back rather than serve nothing.
-    return out or _from_docstrings(mod)
+    return out
+
+
+def load_package(package: str) -> list[dict]:
+    """``[{name, description, props: [...]}]`` for every component the
+    package exports, sorted by name. Raises ImportError if the package is
+    not installed.
+
+    THE LADDER, in order: ``metadata.json`` (the react-docgen build
+    artifact, present only in a tree that has rebuilt) -> the COMMITTED
+    extract ``api_metadata.json`` -> the components' docstrings. It never
+    returns []; see this module's docstring for why an empty return renders
+    an empty page in production while every check stays green.
+    """
+    mod = importlib.import_module(package)
+    pkg_dir = Path(mod.__file__).resolve().parent
+
+    meta_path = pkg_dir / "metadata.json"
+    if meta_path.is_file():
+        # Matched no exported component is the same empty page as no file at
+        # all — fall through rather than serve nothing.
+        got = _from_metadata(mod, meta_path)
+        if got:
+            return got
+
+    # THE COMMITTED EXTRACT, adopted from template 1.6.41 — the half of the
+    # road this fork was missing. `metadata.json` is a build INPUT here,
+    # excluded in three places; `api_metadata.json` is a DIFFERENT file,
+    # deliberately committed, in this module's own output shape. It sidesteps
+    # those exclusions instead of arguing with them, and it carries a
+    # `generated` date that is /api's sitemap lastmod — moved by the script
+    # that regenerates the content, so date and content cannot drift.
+    slim = pkg_dir / SLIM_METADATA
+    if slim.is_file():
+        data = json.loads(slim.read_text(encoding="utf-8"))
+        components = data["components"] if isinstance(data, dict) else data
+        if components:
+            return components
+
+    return _from_docstrings(mod)
+
+
+def slim_generated_on(package: str) -> str | None:
+    """The committed extract's ``generated`` date — /api's sitemap lastmod.
+
+    Committed, so a Docker rebuild cannot reset it the way an mtime can, and
+    it moves exactly when the script that regenerates the content runs.
+    ``None`` where no extract exists: the sitemap then omits the tag, which
+    is the honest answer rather than an invented date.
+    """
+    try:
+        mod = importlib.import_module(package)
+        slim = Path(mod.__file__).resolve().parent / SLIM_METADATA
+        data = json.loads(slim.read_text(encoding="utf-8"))
+        return data.get("generated") if isinstance(data, dict) else None
+    except Exception:  # noqa: BLE001
+        return None
 
 
 def load_packages(packages) -> list[dict]:

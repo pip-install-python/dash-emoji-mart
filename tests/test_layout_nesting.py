@@ -69,6 +69,18 @@ def _resolve(layout):
     return layout() if callable(layout) else layout
 
 
+def test_the_walk_itself_sees_a_nested_list():
+    """NON-VACUITY, ported from the template's 1.6.42 copy — the half this
+    fork verified by hand and never pinned. A guard that cannot go red
+    guards nothing, so the walk must flag the modelviewer shape on demand."""
+    import dash_mantine_components as dmc
+
+    bad = dmc.Container([dmc.Title("Hero"), [dmc.Text("parsed"), dmc.Text("list")]])
+    findings: list = []
+    _walk(bad, "/fixture", findings)
+    assert findings == ["/fixture.Container.children[1]"]
+
+
 @pytest.fixture(scope="module")
 def registry(app_module):
     import dash
@@ -106,10 +118,21 @@ def test_the_docs_pages_really_carry_their_parsed_content(registry):
     whose layout is empty for some *other* reason — which is the same
     symptom the defect produces. So: a real docs page must render a tree
     with real depth, and its heading must be in it."""
-    # The registry is keyed by page NAME, not by path — look the page up by
-    # the thing that is stable.
+    # DERIVED FROM THE REGISTRY, never named (template 1.6.42): the first
+    # page that registered a TOC. Naming a page here made this file the one
+    # thing in the pin that a fork has to edit, and a renamed page turned a
+    # real control into a KeyError.
+    from lib.aside import ASIDE_PATHS
+
+    # THE ROOT IS EXCLUDED, and that is a fork difference worth naming: this
+    # site's `/` heads itself with SITE_BRAND rather than its nav label
+    # ("Home" names nothing on the most-linked URL on the site), so
+    # `page["name"] in str(layout)` is false there by design. The template's
+    # copy has no such rule and can take the first TOC page whatever it is.
+    docs_paths = sorted(p for p in ASIDE_PATHS if p != "/")
+    assert docs_paths, "no docs page registered a TOC"
     by_path = {p.get("path"): p for p in registry.values()}
-    page = by_path.get("/configuration") or by_path["/theming"]
+    page = by_path[docs_paths[0]]
     layout = _resolve(page["layout"])
 
     nodes: list = []

@@ -1,0 +1,249 @@
+{
+ "components": [
+  {
+   "description": "DashEmojiMart wraps the emoji-mart picker (https://github.com/missive/emoji-mart)\nas a Dash component.\n\nSelection is reported through two props, and callbacks may use either:\n\n  * `value` \u2014 a plain string. `emoji.native` for a standard emoji (\"\ud83d\ude00\"), or\n    `emoji.src` for a custom one (the image URL). This is the 0.0.x contract\n    and is unchanged.\n  * `selectedEmoji` \u2014 the full emoji-mart object (id, name, native, unified,\n    shortcodes, keywords, skin, src, ...), for callbacks that need more than\n    the glyph. Added in 0.2.0.\n\nBoth are written in a single `setProps` call, so a callback with both as\nInputs fires once per pick rather than twice.",
+   "name": "DashEmojiMart",
+   "props": [
+    {
+     "default": "",
+     "description": "The ID used to identify this component in Dash callbacks.",
+     "name": "id",
+     "required": false,
+     "type": "string | object"
+    },
+    {
+     "default": "false",
+     "description": "Focus the search input when the picker mounts.",
+     "name": "autoFocus",
+     "required": false,
+     "type": "bool"
+    },
+    {
+     "default": "[]",
+     "description": "Which categories to show, in order. Empty (the default) shows all of\nthem. e.g. `[\"frequent\", \"people\", \"nature\"]`.",
+     "name": "categories",
+     "required": false,
+     "type": "array"
+    },
+    {
+     "default": "{}",
+     "description": "Icons for custom categories, keyed by category id. The value is inlined\nonto the matching entry in `custom` \u2014 typically an inline SVG string.",
+     "name": "categoryIcons",
+     "required": false,
+     "type": "object"
+    },
+    {
+     "default": "",
+     "description": "CSS class applied to the wrapper element around the picker.",
+     "name": "className",
+     "required": false,
+     "type": "string"
+    },
+    {
+     "default": "0",
+     "description": "Incremented once each time the user clicks outside the picker. Use it the\nway you would use `n_clicks` \u2014 for example to close a popover.\n\n\"Outside\" means outside the component's wrapper element, so clicking an\nemoji, the search box or a category tab does NOT increment it. The click\nthat opens the picker does not increment it either. Added in 0.2.0.",
+     "name": "clickedOutside",
+     "required": false,
+     "type": "number"
+    },
+    {
+     "default": "[]",
+     "description": "Custom emoji categories. Each entry is\n`{id, name, emojis: [{id, name, keywords, skins: [{src}]}]}`.",
+     "name": "custom",
+     "required": false,
+     "type": "array"
+    },
+    {
+     "default": "false",
+     "description": "Let the picker's width follow its container instead of `perLine`.",
+     "name": "dynamicWidth",
+     "required": false,
+     "type": "bool"
+    },
+    {
+     "default": "[]",
+     "description": "Background colours cycled through on emoji hover/focus.",
+     "name": "emojiButtonColors",
+     "required": false,
+     "type": "array"
+    },
+    {
+     "default": "'100%'",
+     "description": "Border radius of each emoji button. Default `\"100%\"`.",
+     "name": "emojiButtonRadius",
+     "required": false,
+     "type": "string"
+    },
+    {
+     "default": "36",
+     "description": "Size in px of each emoji button. Default 36.",
+     "name": "emojiButtonSize",
+     "required": false,
+     "type": "number"
+    },
+    {
+     "default": "24",
+     "description": "Size in px of the emoji inside its button. Default 24.",
+     "name": "emojiSize",
+     "required": false,
+     "type": "number"
+    },
+    {
+     "default": "14",
+     "description": "Maximum Emoji version to show. Default 14.",
+     "name": "emojiVersion",
+     "required": false,
+     "type": "number"
+    },
+    {
+     "default": "[]",
+     "description": "Emoji ids to hide from the grid, e.g. `[\"rage\", \"cry\"]`.\n\nGRID ONLY \u2014 searching still finds them, for the same reason as\n`noCountryFlags`: both filters remove the emoji from its category while\n`SearchIndex.search` reads the unfiltered emoji map. Do not rely on this\nto keep a specific emoji away from a user.",
+     "name": "exceptEmojis",
+     "required": false,
+     "type": "array"
+    },
+    {
+     "default": "'auto'",
+     "description": "Category/search icon style: `\"auto\"`, `\"outline\"` or `\"solid\"`.",
+     "name": "icons",
+     "required": false,
+     "type": "string"
+    },
+    {
+     "default": "'en'",
+     "description": "UI locale, e.g. `\"en\"`, `\"fr\"`, `\"de\"`, `\"ja\"`.",
+     "name": "locale",
+     "required": false,
+     "type": "string"
+    },
+    {
+     "default": "4",
+     "description": "Rows reserved for frequently used emojis. Default 4.",
+     "name": "maxFrequentRows",
+     "required": false,
+     "type": "number"
+    },
+    {
+     "default": "'top'",
+     "description": "Category nav position: `\"top\"`, `\"bottom\"` or `\"none\"`.",
+     "name": "navPosition",
+     "required": false,
+     "type": "string"
+    },
+    {
+     "default": "false",
+     "description": "Hide country flags from the grid. Default False.\n\nGRID ONLY \u2014 searching still finds them. This is an emoji-mart\nlimitation, measured against 5.6.0: the filter runs while building each\ncategory and removes the emoji from `category.emojis`, but\n`SearchIndex.search` matches over `Object.values(Data.emojis)`, the\nunfiltered map, and applies no category filter of its own. So with this\non, the flags category shrinks to a small safe list while typing\n\"united\" still returns the flags of the UK, US, UAE and the UN.\n\nNot worked around here on purpose. emoji-mart loads its data into a\nmodule-global exactly once per page, so pre-filtering the data for one\npicker would silently change every other picker on the page and every\npage after it in a Dash SPA. A visible search result is better than an\ninvisible, mount-order-dependent one.",
+     "name": "noCountryFlags",
+     "required": false,
+     "type": "bool"
+    },
+    {
+     "default": "'cry'",
+     "description": "Emoji id shown when a search returns nothing. Default `\"cry\"`.",
+     "name": "noResultsEmoji",
+     "required": false,
+     "type": "string"
+    },
+    {
+     "default": "9",
+     "description": "Emojis per row. Default 9.",
+     "name": "perLine",
+     "required": false,
+     "type": "number"
+    },
+    {
+     "default": "['value']",
+     "description": "Properties whose value is persisted. Defaults to `[\"value\"]`.",
+     "name": "persisted_props",
+     "required": false,
+     "type": "list of one of 'value', 'selectedEmoji'"
+    },
+    {
+     "default": "",
+     "description": "Whether the picker's selection is persisted across browser sessions.",
+     "name": "persistence",
+     "required": false,
+     "type": "bool | string | number"
+    },
+    {
+     "default": "'local'",
+     "description": "Where persisted selections are stored: `\"local\"`, `\"session\"` or\n`\"memory\"`.",
+     "name": "persistence_type",
+     "required": false,
+     "type": "one of 'local', 'session', 'memory'"
+    },
+    {
+     "default": "'point_up'",
+     "description": "Emoji id shown in the idle preview. Default `\"point_up\"`.",
+     "name": "previewEmoji",
+     "required": false,
+     "type": "string"
+    },
+    {
+     "default": "'bottom'",
+     "description": "Preview position: `\"top\"`, `\"bottom\"` or `\"none\"`.",
+     "name": "previewPosition",
+     "required": false,
+     "type": "string"
+    },
+    {
+     "default": "'sticky'",
+     "description": "Search bar position: `\"sticky\"`, `\"static\"` or `\"none\"`.",
+     "name": "searchPosition",
+     "required": false,
+     "type": "string"
+    },
+    {
+     "default": "",
+     "description": "The full emoji-mart object for the current selection \u2014 id, name, native,\nunified, shortcodes, keywords, skin and (for custom emojis) src. Set\nalongside `value` on every pick. Read-only. Added in 0.2.0.",
+     "name": "selectedEmoji",
+     "required": false,
+     "type": "object"
+    },
+    {
+     "default": "'native'",
+     "description": "Emoji set: `\"native\"`, `\"apple\"`, `\"facebook\"`, `\"google\"` or\n`\"twitter\"`. Default `\"native\"`.",
+     "name": "set",
+     "required": false,
+     "type": "string"
+    },
+    {
+     "default": "1",
+     "description": "Default skin tone, 1 (lightest) to 6 (darkest). Default 1.",
+     "name": "skin",
+     "required": false,
+     "type": "number"
+    },
+    {
+     "default": "'preview'",
+     "description": "Skin-tone selector position: `\"preview\"`, `\"search\"` or `\"none\"`.",
+     "name": "skinTonePosition",
+     "required": false,
+     "type": "string"
+    },
+    {
+     "default": "",
+     "description": "Inline styles applied to the wrapper element around the picker.",
+     "name": "style",
+     "required": false,
+     "type": "object"
+    },
+    {
+     "default": "'auto'",
+     "description": "Colour scheme: `\"auto\"`, `\"light\"` or `\"dark\"`.",
+     "name": "theme",
+     "required": false,
+     "type": "string"
+    },
+    {
+     "default": "",
+     "description": "The selected emoji as a string: the native glyph for a standard emoji\n(\"\ud83d\ude00\"), or the image URL for a custom one. Read this in callbacks.",
+     "name": "value",
+     "required": false,
+     "type": "string"
+    }
+   ]
+  }
+ ],
+ "generated": "2026-08-30"
+}

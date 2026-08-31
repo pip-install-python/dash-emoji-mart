@@ -5,6 +5,7 @@ endpoint: "/iconify"
 package: dash-emoji-mart
 category: "Custom emojis"
 order: 20
+nav: "Iconify"
 icon: "simple-icons:iconify"
 lastmod: 2026-08-02
 ---
