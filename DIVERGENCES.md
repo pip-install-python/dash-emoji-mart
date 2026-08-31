@@ -45,6 +45,21 @@ this host serves. `tests/test_claude_kit.py` validates the SHAPE only.
               drift, never a reason to deploy by hand. ABSENT would
               read as `main`.
 
+              STANDING: **clicked**, not merely declared — the owner set
+              the service's Branch field to `release` on 2026-08-30,
+              after this round's first green promote. Until then
+              `render.yaml`'s `branch:` line was documentation and the
+              dashboard was the switch.
+
+              STILL UNPROVEN, and say so rather than rounding up: the
+              wire cannot yet show WHICH branch it follows. Every green
+              push leaves `main` and `release` holding the same sha, so
+              autoDeploy-from-main and autoDeploy-from-release produce
+              an identical /healthz. The discriminating observation is
+              the next push to `main` that goes RED — `release` must not
+              move and the wire must not change. Record it here when it
+              happens; that is the read that closes this row.
+
 Measured on emojimart.2plot.dev, **2026-08-30T21:22Z, build 252967e**
 — the ai_bots row with real vendor UAs (ClaudeBot AND GPTBot, both
 identical: 200 / 200 / 200), the healthz row from the live payload,
