@@ -58,6 +58,13 @@ def main() -> int:
     import dash
 
     client = run.app.server.test_client()
+    # ONE named lane for every request this tool makes, set on the client
+    # rather than threaded through each call. `headers=` alone is not
+    # evidence of a User-Agent — a call passing `headers={"CF-IPCountry":
+    # "FR"}` satisfies a headers grep and names no lane at all — so the
+    # fleet pin asks for the UA token specifically, and environ_base is the
+    # form that cannot be satisfied by accident.
+    client.environ_base["HTTP_USER_AGENT"] = BROWSER_UA
 
     def get(path: str, **kwargs):
         # DEFAULT TO THE BROWSER LANE (template 1.6.40 item 17, ported into
@@ -71,13 +78,7 @@ def main() -> int:
         # stays in the string, AFTER the engine token, so the far side's
         # internal-traffic exclusion still holds (substring match).
         # A check that means the crawler lane passes its own UA explicitly.
-        headers = dict(kwargs.pop("headers", None) or {})
-        headers.setdefault("User-Agent", BROWSER_UA)
-        # `headers=` passed EXPLICITLY at the call, not folded into **kwargs:
-        # the fleet's per-call-site pin reads the call text, and a UA that
-        # arrives through a dict splat is invisible to it. Legible to the
-        # reader for the same reason it is legible to the grep.
-        return client.get(path, headers=headers)
+        return client.get(path, **kwargs)
 
     print("=" * 78)
     print(" 2plot network verification · dash-emoji-mart")
@@ -272,12 +273,10 @@ def main() -> int:
     # -- SPA beacon --------------------------------------------------------
     # The half of the ledger the boilerplate's trio does not cover.
     print("\n[spa beacon]")
-    resp = client.post("/api/pageview", json={"path": "/theming"},
-                       headers={"User-Agent": BROWSER_UA})
+    resp = client.post("/api/pageview", json={"path": "/theming"})
     check("/api/pageview accepts a valid path", resp.status_code == 200,
           f"HTTP {resp.status_code}")
-    resp = client.post("/api/pageview", json={"path": "not-a-path"},
-                       headers={"User-Agent": BROWSER_UA})
+    resp = client.post("/api/pageview", json={"path": "not-a-path"})
     check("/api/pageview rejects a junk path", resp.status_code == 400,
           f"HTTP {resp.status_code}")
 

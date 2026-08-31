@@ -205,12 +205,37 @@ def _expand_source_directives(markdown_content: str) -> str:
         elif fence is None and line.startswith(".. exec::"):
             module_path = line[len(".. exec::"):].strip()
             target = exec_target_file(module_path)
+            # READ the indented options, do not merely consume them. The
+            # first cut of this port skipped past them and published source
+            # the author had withheld.
+            opts = []
             i += 1
             while i < len(lines) and _DIRECTIVE_OPTION.match(lines[i]):
+                opts.append(lines[i].strip())
                 i += 1
-            # The directive line itself is dropped either way — it is noise in
-            # the machine lane. Only the expansion is conditional.
-            if target not in paired:
+            hidden = any(o.replace(" ", "").lower() == ":code:false" for o in opts)
+
+            # PRECEDENCE, and the order is the whole correction:
+            #
+            # 1. DEDUPE FIRST. The source is already in this document via an
+            #    explicit `.. source::`, so announcing it as withheld would
+            #    be a false statement about the page.
+            # 2. `:code: false` is the AUTHOR saying this module is plumbing
+            #    for an embed, not documentation. Expanding it into the
+            #    machine lane publishes exactly what the browser lane
+            #    deliberately hides — inverting the usual asymmetry, and
+            #    silently, because the browser keeps looking right. EVERY
+            #    ONE of this fork's eight exec directives carries it.
+            # 3. A marker, never a silent skip: broken, hidden and absent
+            #    must not look alike.
+            if target in paired:
+                pass
+            elif hidden:
+                out.append(
+                    f"\n<!-- component rendered from {target}; source withheld "
+                    f"by `:code: false` -->\n"
+                )
+            else:
                 out.append(expand(target))
             continue
         elif fence is None and line.startswith(".. source::"):

@@ -439,7 +439,21 @@ def _client_names_a_ua(src: str, var: str) -> bool:
     if re.search(re.escape(var) + r"\.environ_base\b[^\n]*HTTP_USER_AGENT", src):
         return True
     calls = [c for m in _REQUEST_METHODS for c in _calls(src, f"{var}.{m}")]
-    return bool(calls) and all("headers=" in c for c in calls)
+    return bool(calls) and all(_names_a_ua(c) for c in calls)
+
+
+def _names_a_ua(call: str) -> bool:
+    """`headers=` is NOT evidence of a User-Agent (muischeduler, 2026-08-31).
+
+    A call passing `headers={"CF-IPCountry": "FR"}` satisfies a `headers=`
+    grep and names no lane at all — this repo had exactly that one, and its
+    mutation check stayed green until the pin asked for the UA specifically.
+    A fleet-wide grep on `headers=` reports clean trees that are not.
+    """
+    return any(
+        token in call
+        for token in ("HTTP_USER_AGENT", "user_agent=", "User-Agent", "USER_AGENT")
+    )
 
 
 def test_every_test_client_user_names_headers():
@@ -585,8 +599,6 @@ def test_the_skip_link_is_the_first_tab_stop(app_module):
     skip link that is present, which is the three-artifact confusion the
     1.6.42 amendment names from the other direction.
     """
-    import dash
-
     tree = str(app_module.app.layout)
     assert "skip-link" in tree and "Skip to content" in tree
     assert "'#main-content'" in tree or '"#main-content"' in tree
