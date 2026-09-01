@@ -57,6 +57,20 @@ def _ledger_visits():
         return []
 
 
+def _ledger_reads():
+    """Every READ row on disk, flushing the write buffer first.
+
+    The second table (dimll 2.8.0's `on_document_read`). Absent key reads
+    as empty, exactly as the tracker's own writer treats it.
+    """
+    tracker.flush()
+    try:
+        with open(analytics_path()) as f:
+            return json.load(f).get("reads") or []
+    except FileNotFoundError:
+        return []
+
+
 def _rollup():
     """Today's rollup as the hub would receive it, or an all-zero stand-in."""
     from lib.traffic_rollup import daily_rollup
@@ -130,6 +144,61 @@ def test_healthz_is_never_a_visit(client):
     client.get("/healthz", user_agent="Render/1.0 health-check")
     client.get("/healthz", user_agent=BROWSER_UA)
     assert len(_ledger_visits()) == before
+
+
+def test_the_read_table_drops_internal_traffic_too(client, capsys):
+    """SYNC-1.6.43 item 1: "counted nowhere" includes the READ table.
+
+    `record_read` arrived with the 2.8.0 floor and did not inherit the
+    internal-traffic drop `track_visit` has always had, so every 2plot probe
+    that fetched a corpus document — the hub's hourly health sweep, every
+    satellite's link audit, this repo's own post-deploy battery and
+    /wire-verify — landed in `reads` and was very likely the busiest
+    "vendor" on this host's board.
+
+    BOTH DIRECTIONS IN ONE TEST, and the counts PRINTED beside the result:
+    a pin that passes by dropping everything is the same green as a pin
+    that passes correctly, and "no rows" is the negative this round learned
+    not to trust on its own.
+
+    KEYED ON `ua`. EVENT_FIELDS carries `ua`, never `user_agent`; a drop
+    keyed on the wrong name is a silent no-op. Asserted here rather than
+    assumed, because the field name is the fix's whole failure mode.
+    """
+    from importlib.metadata import version
+
+    from dash_improve_my_llms._ledger import EVENT_FIELDS
+
+    resolved = version("dash-improve-my-llms")
+    assert "ua" in EVENT_FIELDS, EVENT_FIELDS
+    assert "user_agent" not in EVENT_FIELDS, EVENT_FIELDS
+
+    # (1) the internal probe — a crawler-shaped UA carrying the token, which
+    # is the network convention for a probe and the shape that would
+    # otherwise write a vendor row.
+    before = len(_ledger_reads())
+    client.get("/llms.txt", user_agent=f"{CRAWLER_UA} {INTERNAL_UA}")
+    after_internal = len(_ledger_reads())
+
+    # (2) a real crawler, so the pin cannot pass by dropping everything.
+    client.get("/llms.txt", user_agent=CRAWLER_UA)
+    after_real = len(_ledger_reads())
+
+    print(
+        f"\n[read-table drop] dash-improve-my-llms {resolved} · "
+        f"reads before={before} after internal probe={after_internal} "
+        f"(+{after_internal - before}) after real crawler={after_real} "
+        f"(+{after_real - after_internal})"
+    )
+
+    assert after_internal == before, (
+        f"the internal probe wrote {after_internal - before} read row(s); "
+        "the token must be dropped before the row is built"
+    )
+    assert after_real == after_internal + 1, (
+        f"a real crawler wrote {after_real - after_internal} rows, expected 1 "
+        "— the drop is swallowing traffic it should keep"
+    )
 
 
 # ----------------------------------------------- the reported numbers -------

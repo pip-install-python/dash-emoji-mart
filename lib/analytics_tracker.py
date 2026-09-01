@@ -395,6 +395,30 @@ class AnalyticsTracker:
         """
         if not isinstance(event, dict):
             return
+
+        # THE INTERNAL-TRAFFIC CONTRACT APPLIES HERE TOO, and this table did
+        # not hold it. `track_visit` has dropped token-carrying requests since
+        # the contract existed; `record_read` arrived with the 2.8.0 floor and
+        # never learned it, so every 2plot probe that fetched a corpus
+        # document — the hub's hourly health sweep, every satellite's link
+        # audit, this repo's own post-deploy battery and `/wire-verify` — has
+        # been landing in `reads` and is very likely the busiest "vendor" on
+        # this host's own board. "Counted nowhere" has to include the read
+        # table, or the contract is only half held.
+        #
+        # BEFORE THE ROW IS BUILT, for the same reason track_visit drops
+        # before classification: a row that exists and is filtered later is
+        # still a row somebody has to know to discount.
+        #
+        # KEYED ON `ua`. EVENT_FIELDS carries `ua`, not `user_agent` — a drop
+        # keyed on the wrong name is silently a no-op, which is this fix's own
+        # failure mode. Verified present in EVENT_FIELDS at both the version
+        # CI resolves and the one production resolves before trusting it.
+        from lib.constants import INTERNAL_UA_TOKEN
+
+        if INTERNAL_UA_TOKEN in (event.get("ua") or "").lower():
+            return
+
         row = {k: event.get(k) for k in EVENT_FIELDS}
         if not KEEP_CLIENT_IP:
             row.pop("client_ip", None)
