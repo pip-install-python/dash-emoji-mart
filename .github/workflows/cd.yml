@@ -74,7 +74,7 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           # FULL history, not the default depth-1 shallow clone. A shallow HEAD
           # pushed onto an EXISTING `release` is rejected as non-fast-forward
@@ -168,8 +168,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           # SITE lane: the interpreter that runs the live battery. Held to the
           # image's minor by tests/test_python_version.py.
